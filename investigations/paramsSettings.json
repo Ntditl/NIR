@@ -1,0 +1,46 @@
+{
+  "resultsDirectory": "benchmarkResults",
+  "tables": {
+    "viewer": true,
+    "movie": true,
+    "cinema": true,
+    "hall": true,
+    "session": true
+  },
+  "queries": [
+    {
+      "name": "count_viewers",
+      "sql": "SELECT COUNT(*) FROM viewer WHERE first_name LIKE :prefix",
+      "parameters": {"prefix": "A%"},
+      "repeats": 3
+    },
+    {
+      "name": "sessions_by_date",
+      "sql": "SELECT COUNT(*) FROM session WHERE session_datetime >= :from",
+      "parameters": {"from": "2020-01-01 00:00:00+00"},
+      "repeats": 3
+    }
+  ],
+  "joinSettings": [
+    {
+      "name": "session_movie",
+      "leftTable": "session",
+      "rightTable": "movie",
+      "joinCondition": "session.movie_id = movie.movie_id",
+      "repeats": 3
+    }
+  ],
+  "indexSettings": [
+    {
+      "table": "viewer",
+      "columns": ["email"],
+      "indexType": "btree"
+    }
+  ],
+  "customSettings": {
+    "researchQueries": [
+      {"name": "all_halls", "sql": "SELECT COUNT(*) FROM hall", "repeats": 2}
+    ]
+  }
+}
+

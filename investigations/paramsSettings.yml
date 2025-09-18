@@ -1,0 +1,120 @@
+# performanceInvestigations/paramsSettings.yml
+
+# Директория для сохранения результатов (CSV-файлы)
+resultsDirectory: benchmarkResults
+
+# 1. Настройки генерации данных: сколько строк вставлять в каждую таблицу
+tables:
+  viewer:
+    rows: 10000
+  movie:
+    rows: 5000
+  viewer_profile:
+    rows: 10000
+  favorite_movies:
+    rows: 20000
+  movie_review:
+    rows: 15000
+  cinema:
+    rows: 100
+  hall:
+    rows: 500
+  session:
+    rows: 2000
+  ticket:
+    rows: 50000
+
+# 2. Настройки измерения CRUD-производительности
+queries:
+  - name: selectViewerById
+    sql: "SELECT * FROM viewer WHERE id = :id"
+    parameters:
+      id: 1
+    repeats: 20
+
+  - name: insertMovie
+    sql: >
+      INSERT INTO movie
+      (title, genre, duration, release_date, rating, age_restriction)
+      VALUES
+      (:title, :genre, :duration, :releaseDate, :rating, :ageRestriction)
+    parameters:
+      title: "Benchmark"
+      genre: "Test"
+      duration: 100
+      releaseDate: 20250101
+      rating: "G"
+      ageRestriction: 0
+    repeats: 10
+
+  - name: deleteOldSessions
+    sql: "DELETE FROM session WHERE session_date < :cutoffDate"
+    parameters:
+      cutoffDate: 20200101
+    repeats: 5
+
+# 3. Настройки для анализа JOIN-операций
+joinSettings:
+  - name: viewerFavoriteMoviesJoin
+    leftTable: viewer
+    rightTable: favorite_movies
+    joinCondition: "viewer.id = favorite_movies.viewer_id"
+    repeats: 15
+
+  - name: movieReviewJoin
+    leftTable: movie
+    rightTable: movie_review
+    joinCondition: "movie.id = movie_review.movie_id"
+    repeats: 15
+
+# 4. Настройки тестирования индексов
+indexSettings:
+  - table: viewer
+    columns:
+      - email
+    indexType: btree
+
+  - table: movie
+    columns:
+      - genre
+    indexType: btree
+
+  - table: session
+    columns:
+      - session_date
+    indexType: btree
+
+# 5. Пользовательские исследования СУБД (можно свои SQL и параметры)
+customSettings:
+  researchQueries:
+    - name: countTicketsPerSession
+      sql: |
+        SELECT session_id, COUNT(*) AS cnt
+        FROM ticket
+        GROUP BY session_id
+      repeats: 5
+
+    - name: avgRatingByMovie
+      sql: |
+        SELECT movie_id, AVG(rating) AS avg_rating
+        FROM movie_review
+        GROUP BY movie_id
+      repeats: 5
+
+# 6. Настройки исследования эффективности индексов
+indexEfficiency:
+  pkTest:
+    table: viewer
+    pkColumn: id
+    rowCounts: [1000, 5000, 10000, 20000]
+    repeats: 5
+  stringTest:
+    table: viewer_profile
+    column: nickname
+    rowCounts: [1000, 5000, 10000, 20000]
+    repeats: 5
+  textTest:
+    table: movie_review
+    column: comment
+    rowCounts: [1000, 5000, 10000, 20000]
+    repeats: 5

@@ -1,0 +1,2 @@
+session_id,movie_id,hall_id,session_datetime,available_seats,final_price
+1,1,1,2025-01-01 15:00:00+03,49,12.00

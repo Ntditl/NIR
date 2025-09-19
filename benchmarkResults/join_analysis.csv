@@ -1,0 +1,10 @@
+name,left_table,right_table,repeats,best_time_seconds
+hall_join_cinema,hall,cinema,3,0.038221
+session_join_movie,session,movie,3,0.037888
+session_join_hall,session,hall,3,0.037957
+ticket_join_session,ticket,session,3,0.038221
+ticket_join_viewer,ticket,viewer,3,0.041399
+viewer_profile_join_viewer,viewer_profile,viewer,3,0.038081
+movie_review_join_movie,movie_review,movie,3,0.051574
+movie_review_join_viewer,movie_review,viewer,3,0.052441
+complex_session_join,session s JOIN movie m ON s.movie_id = m.movie_id JOIN hall h ON s.hall_id = h.hall_id,cinema c,3,0.040405

@@ -13,6 +13,8 @@ from queryPerformance import measureQueryPerformance
 from joinAnalysis import analyzeJoinPerformance
 from indexPerformance import measureIndexPerformance
 from customDbResearch import runCustomDbResearch
+from indexResearch import runIndexResearch
+from simpleDbIndexBench import runSimpleDbIndexBench
 
 
 def runBenchmarks(configPath: str) -> None:
@@ -96,6 +98,18 @@ def runBenchmarks(configPath: str) -> None:
         researchConfig=customConfig,
         outputCsvPath=customResultsPath
     )
+
+    indexResearchConfig = config.get('indexResearch', {})
+    indexResearchDir = os.path.join(resultsDir, 'index_research')
+    print("Running index research suite →", indexResearchDir)
+    runIndexResearch(indexResearchConfig, indexResearchDir)
+
+    simpleDbConfig = config.get('simpleDb', {})
+    simpleDbDir = os.path.join(resultsDir, 'simpledb')
+    print("Running SimpleDB index benchmarks →", simpleDbDir)
+    rowCounts = simpleDbConfig.get('rowCounts', [1000, 5000, 10000])
+    repeats = int(simpleDbConfig.get('repeats', 3))
+    runSimpleDbIndexBench(simpleDbDir, rowCounts=rowCounts, repeats=repeats)
 
     print("All benchmarks completed. Results saved in:", resultsDir)
 

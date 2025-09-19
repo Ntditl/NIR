@@ -180,3 +180,48 @@ def getDropTablesSql():
 
 def getTableNames():
     return TABLE_NAMES
+
+def tableExists(tableName):
+    from lib.databaseConnection import getDbConnection
+    with getDbConnection() as (conn, cur):
+        cur.execute("SELECT 1 FROM information_schema.tables WHERE table_name = %s", (tableName,))
+        return cur.fetchone() is not None
+
+def createAllTables(verbose=True):
+    from lib.databaseConnection import getDbConnection
+    if tableExists('cinema'):
+        if verbose:
+            print('Tables already exist, dropping first')
+        dropAllTables(verbose)
+    statements = getCreateTablesSql()
+    with getDbConnection() as (conn, cur):
+        i = 0
+        while i < len(statements):
+            sql = statements[i]
+            if verbose:
+                line = sql.strip().split('\n')[0].strip()
+                print('EXEC', line[:80])
+            cur.execute(sql)
+            i = i + 1
+
+def dropAllTables(verbose=True):
+    from lib.databaseConnection import getDbConnection
+    statements = getDropTablesSql()
+    with getDbConnection() as (conn, cur):
+        i = 0
+        while i < len(statements):
+            sql = statements[i]
+            if verbose:
+                print('EXEC', sql.strip())
+            cur.execute(sql)
+            i = i + 1
+
+def recreateAllTables(verbose=True):
+    if verbose:
+        print('Dropping schema objects')
+    dropAllTables(verbose)
+    if verbose:
+        print('Creating schema objects')
+    createAllTables(verbose)
+    if verbose:
+        print('Schema ready')

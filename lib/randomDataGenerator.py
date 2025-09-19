@@ -173,10 +173,18 @@ class RandomDataGenerator:
         i = 0
         while i < len(getattr(self, 'generatedHallIds', [])):
             hallId = self.generatedHallIds[i]
+            cur.execute("SELECT seat_count FROM hall WHERE hall_id = %s", (hallId,))
+            seatRow = cur.fetchone()
+            if seatRow is None:
+                i = i + 1
+                continue
+            seatCount = seatRow[0]
             j = 0
             while j < sessionsPerHall:
                 dt = datetime.now(timezone.utc) - timedelta(days=random.randint(0, 365))
-                available = random.randint(0, 150)
+                if seatCount < 0:
+                    seatCount = 0
+                available = random.randint(0, seatCount)
                 priceCents = random.randint(500, 2000)
                 finalPrice = Decimal(priceCents) / Decimal(100)
                 movieIndex = random.randint(0, len(movieIds) - 1)

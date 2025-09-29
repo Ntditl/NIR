@@ -2,27 +2,27 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lib.tableModels import createAllTables, dropAllTables, recreateAllTables, getTableNames
-from lib.sandboxManager import SandboxManager
-from lib.randomDataGenerator import RandomDataGenerator
-from lib.databaseConnection import getDbConnection
+from lib.db.models import createAllTables, dropAllTables, recreateAllTables, getTableNames
+from lib.managers.sandboxManager import SandboxManager
+from lib.data.generators import RandomDataGenerator
+from lib.db.connection import getDbConnection
 from lib.dataManager import DataManager
-from lib.backupManager import BackupManager
+from lib.managers.backupManager import BackupManager
 
 
 def createTables():
     createAllTables(True)
-    print("Tables created")
+    print("Таблицы созданы")
 
 
 def dropTables():
     dropAllTables(True)
-    print("Tables dropped")
+    print("Таблицы удалены")
 
 
 def recreateTables():
     recreateAllTables(True)
-    print("Tables recreated")
+    print("Таблицы пересозданы")
 
 
 def generateSampleData():
@@ -37,31 +37,29 @@ def generateSampleData():
         reviewRate=0.2,
         ticketRate=0.3
     )
-    print("Sample data generated")
+    print("Примерные данные сгенерированы")
 
 
 def showTableCounts():
     with getDbConnection() as (conn, cur):
         tables = getTableNames()
-        i = 0
-        while i < len(tables):
+        for i in range(len(tables)):
             tableName = tables[i]
             cur.execute("SELECT COUNT(*) FROM " + tableName)
             count = cur.fetchone()[0]
-            print(tableName, "has", count, "rows")
-            i = i + 1
+            print(f"{tableName}: {count} строк")
 
 
 def createSandbox():
     sandbox = SandboxManager()
     sandbox.createSandboxSchema()
-    print("Sandbox created")
+    print("Песочница создана")
 
 
 def truncateTable():
-    tableName = input("Enter table name to truncate: ")
+    tableName = input("Введите имя таблицы для очистки: ")
     if not tableName:
-        print("Table name cannot be empty.")
+        print("Имя таблицы не может быть пустым.")
         return
     DataManager().truncateTable(tableName)
 
@@ -70,31 +68,31 @@ def backupData():
     backupDir = os.path.join(os.path.dirname(__file__), '..', 'backups')
     manager = BackupManager(backupDir)
     manager.backupAllTables()
-    print(f"Backup completed to {backupDir}")
+    print(f"Резервное копирование завершено в {backupDir}")
 
 
 def restoreData():
     backupDir = os.path.join(os.path.dirname(__file__), '..', 'backups')
     manager = BackupManager(backupDir)
     manager.restoreAllTables()
-    print(f"Restore completed from {backupDir}")
+    print(f"Восстановление выполнено из {backupDir}")
 
 
 def main():
-    print("Available commands:")
-    print("1 - Create tables")
-    print("2 - Drop tables")
-    print("3 - Recreate tables")
-    print("4 - Generate sample data")
-    print("5 - Show table counts")
-    print("6 - Create sandbox")
-    print("7 - Truncate a table")
-    print("8 - Backup all tables")
-    print("9 - Restore all tables")
-    print("0 - Exit")
+    print("Доступные команды:")
+    print("1 - Создать таблицы")
+    print("2 - Удалить таблицы")
+    print("3 - Пересоздать таблицы")
+    print("4 - Сгенерировать примерные данные")
+    print("5 - Показать количество строк в таблицах")
+    print("6 - Создать песочницу")
+    print("7 - Очистить таблицу")
+    print("8 - Создать бэкап всех таблиц")
+    print("9 - Восстановить все таблицы")
+    print("0 - Выход")
 
     while True:
-        choice = input("Enter command number: ")
+        choice = input("Введите номер команды: ")
 
         if choice == "1":
             createTables()
@@ -115,10 +113,10 @@ def main():
         elif choice == "9":
             restoreData()
         elif choice == "0":
-            print("Goodbye")
+            print("Выход")
             break
         else:
-            print("Unknown command")
+            print("Неизвестная команда")
 
 
 if __name__ == '__main__':

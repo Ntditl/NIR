@@ -1,0 +1,719 @@
+
+Модуль random
+Для генерации псевдослучайных значений
+import random
+
+Функция random()
+Генерирует случайное вещественное число из диапазона \[0.0, 1.0)
+random.random()  # -> 0.11085258654745067
+
+Задачи: генерация
+
+1. Целое число
+   1.1) \[0; b)
+   1.2) \[a; b)
+   1.3) \[a; b) с шагом s (a, a+s, a+2s, …)
+2. Элемент или элементы из массива
+   2.1) С одинаковой вероятностью
+   2.2) С разной вероятностью
+3. Случайная перетасовка массива
+
+Функция randint(a, b)
+Генерирует случайное число из диапазона \[a, b]
+random.randint(5, 10)  # -> 8
+
+Функция randrange(start, stop, step=1)
+random.randrange(stop) возвращает число из \[0, stop)
+random.randrange(start, stop, step) возвращает число из \[start, stop) с шагом step
+Примеры:
+random.randrange(10)        # -> 9
+random.randrange(0, 10, 2)  # -> 4
+
+Функция choice(seq)
+Выдаёт случайное значение из последовательности
+random.choice(L)         # -> 2
+random.choice('abcdef')  # -> 'b'
+
+Функция choices(seq, ...)
+Выбирает k элементов с повторениями
+Примеры:
+L = \[1, 2, 3, 4]
+random.choices(L)        # -> \[3]
+random.choices(L, k=3)   # -> \[1, 1, 2]
+random.choices(L, \[1, 4, 2, 3], k=2)  # -> \[4, 2]
+
+Функция sample(seq, k)
+Возвращает список размера k без повторений
+Пример:
+random.sample(L, 4)  # -> \[3, 1, 4, 2]
+
+Функция sample с параметром counts
+Позволяет задать вероятность выбора
+Примеры:
+random.sample(\[1, 2], counts=\[4, 1])        # -> \[1]
+random.sample(\[1, 2], 4, counts=\[4, 1])     # -> \[1, 1, 2, 1]
+
+Функция shuffle(seq)
+Случайным образом перемешивает последовательность на месте
+Пример:
+L = \[1, 2, 3, 4]
+random.shuffle(L)  # L -> \[3, 2, 4, 1]
+
+Функция randbytes(n) (Python 3.9+)
+Генерирует n случайных байтов
+Пример:
+random.randbytes(10)  # -> b'\x0f\xda\x8b;\xd1N\xd2cA\xd2'
+
+Функция getrandbits(n) (Python 3.9+)
+Генерирует случайное число, состоящее из n бит
+Пример:
+random.getrandbits(50)  # -> 1026828266097004
+
+Функция seed(a=None)
+Задаёт начальное состояние генератора случайных чисел (seed)
+a может быть int, float, str или bytes
+
+Пример:
+random.seed(1)
+random.random()  # -> 0.13436424411240122
+random.random()  # -> 0.8474337369372327
+random.seed(1)
+random.random()  # -> 0.13436424411240122
+random.random()  # -> 0.8474337369372327
+
+Функции getstate() и setstate(state)
+Позволяют сохранить и восстановить состояние генератора
+
+Пример:
+random.seed(1)
+random.random()        # -> 0.13436424411240122
+state = random.getstate()
+random.random()        # -> 0.8474337369372327
+random.setstate(state)
+random.random()        # -> 0.8474337369372327
+
+
+Общая схема работы с базами данных
+1 Подключение к базе данных (connection)
+2 Выполнение запроса(ов)
+• Изменяющие запросы создают транзакцию, которую нужно
+зафиксировать
+3 Закрытие подключения
+SQLite
+• Простая БД, хранящаяся на диске и не требующая
+процесс-сервер
+Модуль sqlite3
+import sqlite3
+Создание и подключение БД
+con = sqlite3.connect("tutorial.db")
+• Создаёт подключение к БД (если БД нет, создаёт файл)
+• Возвращается объект класса Connection
+Создание курсора
+cur = con.cursor()
+• Для выполнения оператора SQL
+Создание таблицы
+cur.execute("CREATE TABLE movie(title, year, score)")
+• Используется гибкая типизация (flexible typing)
+Список таблиц
+res = cur.execute("SELECT name FROM sqlite_master")
+s = res.fetchone() # s -> 'movie'
+• sqlite_master – таблица, содержащая имена всех
+созданных таблиц
+Однократное создание таблицы
+res = cur.execute("SELECT name FROM sqlite_master WHERE
+name='movie’”)
+if res.fetchone() is None:
+# создание таблицы
+Добавление данных
+cur.execute("""
+INSERT INTO movie VALUES
+('Monty Python and the Holy Grail', 1975, 8.2),
+('And Now for Something Completely Different', 1971,
+7.5)
+""")
+Транзацкии
+• execute создаёт транзакцию, которую нужно
+зафиксировать
+con.commit()
+import sqlite3
+con = sqlite3.connect("tutorial.db")
+cur = con.cursor()
+res = cur.execute("SELECT name FROM sqlite_master WHERE name='movie'")
+if res.fetchone() is None:
+cur.execute('CREATE TABLE movie(title, year, score)')
+cur.execute("""
+INSERT INTO movie VALUES
+('Monty Python and the Holy Grail', 1975, 8.2),
+('And Now for Something Completely Different', 1971, 7.5)
+""")
+con.commit()
+Получение данных
+res = cur.execute("SELECT score FROM movie")
+res.fetchall() # -> [(8.2,), (7.5,)]
+Привязка динамических данных (1)
+cur.execute("INSERT INTO movie VALUES(?, ?, ?)",
+("Monty Python", 1982, 7.9)
+)
+con.commit() # !
+Привязка динамических данных (2)
+data = [
+("Monty Python Live at the Hollywood Bowl", 1982, 7.9),
+("Monty Python's The Meaning of Life", 1983, 7.5),
+("Monty Python's Life of Brian", 1979, 8.0),
+]
+cur.executemany("INSERT INTO movie VALUES(?, ?, ?)", data)
+con.commit() # !
+Итерация по строкам
+for row in cur.execute("SELECT year, title FROM movie ORDER
+BY year"):
+print(row)
+# (1971, 'And Now for Something Completely Different’)
+# …
+Дополнительные запросы
+res = new_cur.execute("SELECT title, year FROM movie ORDER
+BY score DESC")
+Установка и подключение MySQL
+# python -m pip install mysql-connector-python
+import mysql.connector
+mydb = mysql.connector.connect(
+host="localhost",
+user="username",
+password="password"
+)
+mycursor = mydb.cursor()
+План презентации
+▶️ Принципы получения/освобождения ресурсов
+▶️ Оператор with/as для освобождения ресурсов
+▶️ Создание собственных контекстных менеджеров — классов,
+поддерживающих автоматическое освобождение ресурсов
+▶️ Библиотека contextlib
+▶️ Примеры контекстных менеджеров
+▶️ Контекстные менеджеры при работе с БД
+Работа с файлами
+Открытие и закрытие файла
+▶️ Файл требуется закрыть
+f = open('input.txt')
+# ... Работа с файлом
+(*)
+f.close()
+▶️ Открытие файла — получение ресурса (acquisition), закрытие —
+освобождение (release)
+Проблема при исключении
+▶️ Если будет исключение в (*), файл закрыт не будет
+f = open('input.txt')
+# ... Работа с файлом
+(*)
+f.close()
+Гарантированное закрытие файла
+f = open('input.txt')
+try:
+# ... Работа с файлом
+(*)
+finally:
+f.close()
+Оператор with/as
+Автоматическое закрытие файла: with/as
+with open('input.txt') as f:
+# ... Работа с файлом
+(*)
+# файл закроется автоматически даже при исключении в (*)
+▶️ with/as упрощает процесс управления ресурсом
+Общая форма with/as
+with expression [as target] (, expression [as target])*:
+body
+▶️ Пример
+with open('in.txt') as f1, open('out.txt', 'w') as f2:
+body
+# Эквивалентно
+with open('in.txt') as f1:
+with open('out.txt', 'w') as f2:
+body
+Аналоги with/as
+▶️ В CSharp — using
+▶️ В C++ — RAII
+Создание собственных контекстных
+менеджеров
+Пример: FileManager
+class FileManager:
+def __init__(self, file_name):
+self.file_name = file_name
+def __enter__(self):
+self.file = open(self.file_name)
+return self.file
+def __exit__(self, *args):
+self.file.close()
+with FileManager('in.txt') as f:
+f.write('hello')
+Терминология
+▶️ Протокол контекстного управления (“context management protocol”) —
+методы __enter__() и __exit__()
+▶️ Контекстный менеджер (“context manager”) — объект, поддерживающий
+этот протокол
+▶️ Контекстное выражение (“context expression” ) — выражение после with
+Алгоритм with/as
+1 Выполняется выражение в конструкции with/as
+2 Вызывается метод __enter__: если присутствует as, то возвращаемое
+методом __enter__ значение записывается в переменную
+3 Выполняется тело
+4 Вызывается метод __exit__ (после завершения тела или после
+исключения)
+Упрощенный протокол with/as
+obj = (expression).__enter__()
+try:
+body
+finally:
+obj.__exit__()
+Параметры метода __exit__
+▶️ При исключении
+__exit__(self, <Тип исключения>, <Значение>, <Объект traceback>)
+▶️ Если метод возвращает True, тогда исключение «поглащается» (метод
+обработал исключение)
+▶️ Если false — исключение передаётся вышестоящему обработчику
+▶️ Если не было исключения — вызов с параметрами None, None, None
+Пример __exit__ (1)
+def __exit__(self, Type, Value, Trace):
+print('__exit__()')
+if Type is None:
+print('Исключение не возникло')
+else:
+print('Исключение ', Value)
+return false # Исключение не обработано
+Пример __exit__ (2)
+def __exit__(self, type, value, traceback):
+return isinstance(value, TypeError)
+# Обрабатывается только исключение TypeError
+Пакет contextlib
+Реализация контекстного менеджера с помощью yield
+def controlled_execution():
+print('start')
+try:
+print('before')
+yield 'hello'
+print('after')
+finally:
+print('end')
+x = controlled_execution()
+print(next(x)) # start before hello end
+# end выведется во время сборки мусора генератора x!!
+Использование пакета contextlib
+from contextlib import contextmanager
+@contextmanager
+def managed_resource(*args, **kwds):
+# Code to acquire resource, e.g.:
+resource = acquire_resource(*args, **kwds)
+try:
+yield resource
+finally:
+# Code to release resource, e.g.:
+release_resource(resource)
+▶️ После завершения with — managed_resource продолжается после yield
+▶️ Если было исключение — переход в finally
+Пример использования пакета contextlib: file manager
+from contextlib import contextmanager
+@contextmanager
+def file_manager(*args, **kwargs):
+file = open(*args, **kwargs)
+try:
+yield file
+print('no exception') # если не было исключения в теле with
+finally:
+file.close()
+Пример генераторного декоратора (1)
+class GeneratorContextManager(object):
+def __init__(self, gen):
+self.gen = gen
+def __enter__(self):
+try:
+return next(self.gen)
+except StopIteration:
+raise RuntimeError("generator didn't yield")
+
+Пример генераторного декоратора (2)
+def __exit__(self, type, value, traceback):
+if type is None:
+try:
+next(self.gen)
+except StopIteration:
+return
+else:
+raise RuntimeError("generator didn't stop")
+else:
+try:
+self.gen.throw(type, value, traceback)
+raise RuntimeError("generator didn't stop after throw()")
+except StopIteration:
+return true
+except:
+if sys.exc_info()[1] is not value:
+raise
+Пример генераторного декоратора (3)
+def contextmanager(func):
+def helper(*args, **kwds):
+return GeneratorContextManager(func(*args, **kwds))
+return helper
+Некоторые контекстные менеджеры из contextlib
+▶️ closing(obj) — после with вызывает obj.close()
+with closing(urlopen('https://www.python.org')) as page:
+for line in page:
+print(line)
+▶️ suppress(*exceptions) — позволяет подавить исключения
+with suppress(FileNotFoundError):
+os.remove('somefile.tmp')
+▶️ redirect_stdout(new_target)
+with open('help.txt', 'w') as f:
+with redirect_stdout(f):
+help(pow)
+Примеры контекстных менеджеров
+Имена контекстных менеджеров
+▶️ Прошедшее время (“-ed”) — выполняется в __enter__ и отменяется в
+__exit__
+▶️ Progressive tense (“-ing”) — действие, которое будет совершено в __exit__
+Пример: транзакции
+@contextmanager
+def transaction(db):
+db.begin()
+try:
+yield None
+except:
+db.rollback()
+raise
+else:
+db.commit()
+Пример: перенапраление вывода
+@contextmanager
+def stdout_redirected(new_stdout):
+save_stdout = sys.stdout
+sys.stdout = new_stdout
+try:
+yield None
+finally:
+sys.stdout = save_stdout
+# Применение
+with opened(filename, "w") as f:
+with stdout_redirected(f):
+print "Hello world"
+Пример: открытие с обработкой ошибок (определение)
+@contextmanager
+def opened_w_error(filename, mode="r"):
+try:
+f = open(filename, mode)
+except IOError, err:
+yield None, err
+else:
+try:
+yield f, None
+finally:
+f.close()
+Пример: открытие с обработкой ошибок (применение)
+with opened_w_error("file.txt") as (f, err):
+if err:
+print("IOError:", err)
+else:
+file_content = f.read()
+Пример: обобщенный «закрыватель»
+class closing:
+def __init__(self, obj):
+self.obj = obj
+def __enter__(self):
+return self.obj
+def __exit__(self, *exc_info):
+try:
+close_it = self.obj.close
+except AttributeError:
+pass
+else:
+close_it()
+Контекстные менеджеры при работе с
+БД
+Автоматический commit
+▶️ Если тело завершается без исключений, тогда происходит commit, в
+противном случае (а также если commit не проходит) — rollback
+▶️ Если транзакция не создаётся, ничего не происходит
+▶️ commit есть у Connection и Cursor
+with con:
+cur = con.cursor()
+cur.execute("INSERT INTO lang(name) VALUES(?)", ("Python",))
+with cur:
+cur.execute("INSERT INTO lang(name) VALUES(?)", ("Python",))
+Отсутствие авто закрытия подключения/курсора
+▶️ Контекстный менеджер лишь выполняет commit/rollback, но не
+закрывает подключение!!
+▶️ Метод close() автоматически вызывается у подключения/курсора при
+их удалении (при выходе из области видимости)!!
+▶️ Метод close() можно выполнить вручную
+timeit – модуль для измерения
+времени выполнения кода
+Общая информация
+• timeit выполняет код множество раз⇒ дает более
+релевантное время
+Варианты использования timeit
+s = "'-'.join(str(n) for n in range(100))"
+• Через консоль
+$ python -m timeit s
+• В python
+import timeit
+time = timeit.timeit(s)
+timeit через консоль
+python -m timeit [-n N][-r R][-u U][-s S][-h]
+["statement1" ["statement2" ...]]
+• R замеров, в каждом N циклов операторы statementi
+• Результат – минимальное время выполнения одного
+statement
+Примеры statement: один оператор
+python -m timeit "a=1"
+python -m timeit "a = 1; b = 2; c = a + b"
+Примеры statement: несколько операторов
+python –m timeit
+"s=0"
+"for i in range(100): s += 0"
+*задавать параметры нужно в одну строку
+Примеры statement: несколько операторов
+python –m timeit
+"a = [1, -2, 3]"
+"m = a[0]"
+"for b in a:"
+" if b > m:"
+" m = b"
+Параметры: количество циклов
+• -n N, --number=N – сколько раз (количество циклов
+[loops]) выполнять 'statement' – это один замер
+• если не задано, то количество циклов подбирается с шагом
+так, чтобы время выполнения ≤0.2 секунды
+Параметры: количество замеров
+• -r R, --repeat=R – по умолчанию 5
+Схема работы параметров N и R
+import time
+times = []
+program = '\n'.join(statements)
+for i in range(R):
+start = time.time()
+for j in range(N):
+exec(program)
+end = time.time()
+times.append((end - start)/N)
+print(min(times))
+Параметры: подготовительный код
+• -s S, --setup=S – оператор(ы), выполняемый(ые)
+перед каждым замером (по умолч pass). Например,
+• для импортирования модулей, для создания объектов
+Примеры подготовительного кода (1)
+python –m timeit
+-s "import math"
+"[math.sqrt(i) for i in range(100)]"
+python –m timeit
+-s "import random"
+"[random.randrange(10) for _ in range(100)]"
+Примеры подготовительного кода (2)
+python –m timeit
+-s "import random"
+-s "import math"
+"math.sqrt(random.randrange(10))"
+Примеры подготовительного кода
+python –m timeit -n 1000 -r 3
+-s "print(1)"
+"a = 2"
+# 1 выводится 3 раза
+Схема работы подготовительного кода
+times = []
+program = '\n'.join(statements)
+for i in range(R):
+exec('\n'.join(setups))
+start = time.time()
+for j in range(N):
+exec(program)
+end = time.time()
+times.append((end - start)/N)
+print(min(times))
+Дополнительные параметры
+• -p, --process – измеряется время выполнения
+процесса, а не просто прошедшее время (время сна
+процесса не учитывается)
+• -u, --unit=U – указываем единицу измерения: nsec,
+usec (микросек), msec, sec
+• -v, --verbose - печатает «сырые» (raw, подробные)
+результаты измерения времени
+• -h, --help
+Python-интерфейс: функция timeit
+timeit.timeit(stmt='pass', setup='pass',
+timer=<default timer>, number=1000000)¶
+• setup выполняется один раз
+• stmt и setup – строка или ссылка на функцию (имя
+функции), не принимающую аргументов
+• Результат – время выполнения number раз statement в секундах
+Пример использования функции timeit
+import timeit
+time = timeit.timeit(
+'math.sqrt(10)',
+setup='import math',
+number=1000
+)
+Многострочный код
+setup = '''
+Создание списка s
+Могут определяться функции и классы, необходимые для
+кода
+'''
+time = timeit.timeit(
+'a=s[:]; sorted(a)',
+setup=setup,
+number=1000
+)
+Измерение времени выполнения функции
+• Функция без аргуметов
+def setupfunc(): …
+def func(): …
+time = timeit.timeit(func, setupfunc,
+number=1000)
+Строка vs функция
+• В функции можно легко изменить измеряемый код и
+протестировать
+Время одного выполнения
+n = 10000
+time = timeit.timeit(func, setupfunc,
+number=n)
+print(time/n) # в секундах
+Python-интерфейс: функция repeat
+timeit.repeat(stmt='pass', setup='pass',
+timer=<default timer>, repeat=5, number=1000000)
+• Выполняет repeat раз замер, где замер – измерение времени
+выполнения number раз statement
+• Возвращает список результатов замеров в секундах
+Пример использования repeat
+repeats_time = timeit.repeat(
+func, setupfunc,
+number=1000, repeat=5
+)
+print(min(repeats_time))
+timeit – Python-интерфейс: класс Timer
+Timer(stmt='pass', setup='pass', timer=<timer function>)
+• Методы класса
+• timeit(number=1000000)¶
+• autorange(callback=None) – автоматически определяет как много раз
+
+запуска timeit(), чтобы время выполнения >= 0.2 сек, возвращает
+соотвествующее количество запусков
+• Число вызовов timeit() возрастает по последовательности 5, 10, 20, 50, …
+• repeat(repeat=5, number=1000000) – вызывает timeit() repeat раз
+• Функции timeit и repeat создают объект класса Timer и вызывают
+соответствующий метод
+Продвинутые техники
+измерения времени
+Функции с непустыми аргументами
+from functools import partial
+import timeit
+def to_time(items): ...
+test_items = [1, 2, 3] * 100
+time = timeit.timeit(
+partial(to_time, test_items)
+)
+Измерение изменяющих функций
+• Изменяющая функция
+timeit.timeit(
+"L.sort()",
+setup="создание списка L"
+)
+Измерение изменяющих функций
+• Изменяющий код
+python -m timeit
+-s "x = [0]*100000"
+"while x: x.pop()"
+Решение проблемы
+• Необходимо изолировать запуски измерений
+timeit.timeit(
+"m=L[:]; m.sort()",
+setup="создание списка L"
+)
+python -m timeit
+"x = [0]*100000; while x: x.pop()"
+Измерение накладных расходов
+• Необходимо учитывать накладные расходы и вычесть
+время из результата
+timeit.timeit(
+"m=l[:]",
+setup="создание списка«
+)
+python -m timeit "x = [0]*100000"
+Более сложный пример
+python -m timeit -s "x = 0" "x += 1" # 0.0476
+• Чистые накладные расходы:
+• python -m timeit -s "x = 0" ""
+# 0.014
+• Время поиска x:
+• python -m timeit -s "x = 0" "x"
+# 0.0166
+Сборщик мусора
+• timeit() временно отключает сборщик мусора на время
+измерений
+• Преимущество: независимые измерения - более сопоставимыми
+• Недостаток: сборщик мусора может быть важным компонентом
+производительности исследуемой функции
+• Включить сборщик мусора
+timeit.timeit('for i in xrange(10): oct(i)',
+'gc.enable()'
+)
+Резюме
+• timeit – простой способ для измерения времени
+выполнения кода
+• Консольный интерфейс
+• Python-интерфейс
+Основы matplotlib
+Установка
+• pip install -U matplotlib
+• Для проверки:
+import matplotlib
+Построение графиков
+Пример 1
+import matplotlib.pyplot as plt
+plt.plot([1, 2, 3, 4, 5], [1, 2, 3, 4, 5])
+plt.show()
+Пример 2 (настройка отображения)
+import matplotlib.pyplot as plt
+x = y = list(range(1, 6))
+plt.title("Линейная зависимость y = x") #
+заголовок
+plt.xlabel("x") # подпись оси абсцисс
+plt.ylabel("y") # подпись оси ординат
+plt.grid() # отображение сетки
+plt.plot(x, y) # построение графика
+plt.show()
+Пример 3 (изменение типа линии)
+plt.plot(x, y, "r--") # красный пунктирный
+Пример 4 (несколько графиков)
+y2 = [i**2 for i in x]
+plt.plot(x, y1, x, y2) # построение графика
+Пример 5 (легенда)
+plt.plot(x, y2, label='y2 legend')
+plt.legend()
+# размещение из 'best', 'upper right', 'upper
+left', 'lower left', 'lower right', 'right',
+'center left', 'center right', 'lower center',
+'upper center', 'center'
+plt.legend(loc='upper right')
+Пример 6 (несколько полей)
+plt.figure(figsize=(9, 9))
+plt.subplot(2, 1, 1)
+plt.plot(x, y1)
+plt.title("Зависимости: y1 = x, y2 = x^2")
+plt.ylabel("y1")
+plt.grid(True)
+plt.subplot(2, 1, 2)
+plt.xlabel("x"); plt.ylabel("y^2")
+plt.grid(True)
+plt.plot(x, y2)
+plt.show()
+Построение диаграммы
+Пример 7 (Простейшая диаграмма)
+fruits = ["apple", "peach", "orange", "banana"]
+amounts = [34, 25, 43, 31]
+plt.bar(fruits, amounts)
+plt.title("Fruits amount!")
+plt.xlabel("Fruit")
+plt.ylabel("Amount")
+plt.show()
+Настройки matplotlib
+• Линия графика: цвет, толщина, тип линии
+• Оси и подписи
+• Сетка и легенда
+Резюме
+• matplotlib – библиотека для построения графиков и
+диаграмм

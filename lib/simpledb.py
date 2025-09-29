@@ -3,6 +3,7 @@ import json
 import struct
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'simpledb_data')
+MAX_UINT64 = (1 << 64) - 1
 
 class Schema:
     def __init__(self, tableName, columns):
@@ -26,6 +27,8 @@ class TableFiles:
         return os.path.join(self.baseDir, self.tableName + '.rows')
     def maskPath(self):
         return os.path.join(self.baseDir, self.tableName + '.mask')
+    def lensPath(self):
+        return os.path.join(self.baseDir, self.tableName + '.lens')
     def indexPath(self, colName):
         return os.path.join(self.baseDir, self.tableName + '.' + colName + '.index')
 
@@ -113,6 +116,8 @@ class TableEngine:
             pass
         with open(self.files.maskPath(), 'wb') as f:
             pass
+        with open(self.files.lensPath(), 'wb') as f:
+            pass
     def open(self):
         for col in self.schema.columns:
             if col.get('index') == True and col['type'] == 'INT':
@@ -131,6 +136,9 @@ class TableEngine:
     def _appendRowOffset(self, offset):
         with open(self.files.rowsPath(), 'ab') as f:
             f.write(struct.pack('<Q', int(offset)))
+    def _appendRowLength(self, length):
+        with open(self.files.lensPath(), 'ab') as f:
+            f.write(struct.pack('<I', int(length)))
     def _getRowOffset(self, rowId):
         with open(self.files.rowsPath(), 'rb') as f:
             f.seek(rowId * 8)
@@ -138,6 +146,15 @@ class TableEngine:
             if len(data) < 8:
                 return None
             return struct.unpack('<Q', data)[0]
+    def _getRowLength(self, rowId):
+        if not os.path.isfile(self.files.lensPath()):
+            return None
+        with open(self.files.lensPath(), 'rb') as f:
+            f.seek(rowId * 4)
+            data = f.read(4)
+            if len(data) < 4:
+                return None
+            return struct.unpack('<I', data)[0]
     def _isRowActive(self, rowId):
         with open(self.files.maskPath(), 'rb') as f:
             f.seek(rowId)
@@ -153,26 +170,26 @@ class TableEngine:
         if colType == 'INT':
             n = int(value)
             if n < 0:
-                n = 0
+                raise ValueError('INT negative')
+            if n > MAX_UINT64:
+                raise ValueError('INT overflow')
             return struct.pack('<Q', n)
-        else:
-            s = str(value)
-            b = s.encode('utf-8')
-            if colMax is not None:
-                if len(b) > int(colMax):
-                    b = b[:int(colMax)]
-            ln = len(b)
-            return struct.pack('<I', ln) + b
+        s = str(value)
+        b = s.encode('utf-8')
+        if colMax is not None:
+            if len(b) > int(colMax):
+                b = b[:int(colMax)]
+        ln = len(b)
+        return struct.pack('<I', ln) + b
     def _unpackValue(self, colType, data, offset):
         if colType == 'INT':
             v = struct.unpack('<Q', data[offset:offset+8])[0]
             return v, offset + 8
-        else:
-            ln = struct.unpack('<I', data[offset:offset+4])[0]
-            start = offset + 4
-            end = start + ln
-            s = data[start:end].decode('utf-8', errors='ignore')
-            return s, end
+        ln = struct.unpack('<I', data[offset:offset+4])[0]
+        start = offset + 4
+        end = start + ln
+        s = data[start:end].decode('utf-8', errors='ignore')
+        return s, end
     def insertRow(self, valuesDict):
         cols = self.schema.columns
         count = len(cols)
@@ -195,8 +212,8 @@ class TableEngine:
             payload = payload + packed
             i = i + 1
         header = struct.pack('<H', count)
-        i = 0
         dirBytes = b''
+        i = 0
         while i < len(offsets):
             dirBytes = dirBytes + struct.pack('<I', offsets[i])
             i = i + 1
@@ -205,6 +222,7 @@ class TableEngine:
             startOffset = f.tell()
             f.write(rowBytes)
         self._appendRowOffset(startOffset)
+        self._appendRowLength(len(rowBytes))
         self._appendMask(True)
         rowId = self.rowCount() - 1
         i = 0
@@ -224,6 +242,14 @@ class TableEngine:
         off = self._getRowOffset(rowId)
         if off is None:
             return None
+        length = self._getRowLength(rowId)
+        if length is not None:
+            with open(self.files.dataPath(), 'rb') as f:
+                f.seek(off)
+                data = f.read(length)
+                if len(data) < length:
+                    return None
+                return data
         with open(self.files.dataPath(), 'rb') as f:
             f.seek(off)
             head = f.read(2)
@@ -276,6 +302,8 @@ class TableEngine:
         with open(self.files.rowsPath(), 'wb') as f:
             pass
         with open(self.files.maskPath(), 'wb') as f:
+            pass
+        with open(self.files.lensPath(), 'wb') as f:
             pass
         for name in list(self.indexes.keys()):
             self.indexes[name].map = {}
@@ -517,7 +545,10 @@ class SimpleDatabase:
             cols = []
             for seg in colsPart.split(','):
                 cols.append(seg.strip())
-            valsPart = s[s.find('values')+6:].strip()
+            posVals = low.find('values')
+            if posVals < 0:
+                return []
+            valsPart = s[posVals+6:].strip()
             if valsPart.startswith('(') and valsPart.endswith(')'):
                 valsPart = valsPart[1:-1]
             valsRaw = []
@@ -563,16 +594,15 @@ class SimpleDatabase:
             if pwhere >= 0:
                 wherePart = tname[pwhere+7:].strip()
                 tname = tname[:pwhere].strip()
-                if '="' in wherePart:
-                    name = wherePart.split('=')[0].strip()
-                    val = wherePart.split('=')[1].strip()
-                    if val.startswith('"') and val.endswith('"'):
-                        val = val[1:-1]
-                    where = (name, val)
-                else:
-                    name = wherePart.split('=')[0].strip()
-                    val = int(wherePart.split('=')[1].strip())
-                    where = (name, val)
+                eqPos = wherePart.find('=')
+                if eqPos >= 0:
+                    left = wherePart[:eqPos].strip()
+                    right = wherePart[eqPos+1:].strip()
+                    if right.startswith('"') and right.endswith('"') and len(right) >= 2:
+                        right = right[1:-1]
+                        where = (left, right)
+                    else:
+                        where = (left, int(right))
             colNames = []
             if colsPart == '*':
                 colNames = ['*']
@@ -596,19 +626,18 @@ class SimpleDatabase:
             after = s[len('delete from'):].strip()
             tname = after.split()[0]
             where = after[after.lower().find('where')+5:].strip()
-            if '="' in where:
-                name = where.split('=')[0].strip()
-                val = where.split('=')[1].strip()
-                if val.startswith('"') and val.endswith('"'):
-                    val = val[1:-1]
-                eng = self._getEngine(tname)
-                eng.deleteWhere(name, val)
-                return []
-            else:
-                name = where.split('=')[0].strip()
-                val = int(where.split('=')[1].strip())
-                eng = self._getEngine(tname)
-                eng.deleteWhere(name, val)
-                return []
+            eqPos = where.find('=')
+            if eqPos >= 0:
+                left = where[:eqPos].strip()
+                right = where[eqPos+1:].strip()
+                if right.startswith('"') and right.endswith('"') and len(right) >= 2:
+                    rightVal = right[1:-1]
+                    eng = self._getEngine(tname)
+                    eng.deleteWhere(left, rightVal)
+                    return []
+                else:
+                    eng = self._getEngine(tname)
+                    eng.deleteWhere(left, int(right))
+                    return []
+            return []
         return []
-

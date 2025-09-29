@@ -22,209 +22,152 @@
       "setupSql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench', 'sel', 'bench_sel_'||g||'@ex.com', '+000'||g FROM generate_series(1, :count) g;",
       "sql": "SELECT COUNT(*) FROM viewer WHERE email LIKE 'bench_sel_%';",
       "cleanupSql": "DELETE FROM viewer WHERE email LIKE 'bench_sel_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "viewer_insert_bulk", "counts": [100, 1000, 5000],
       "sql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench','ins','bench_ins_'||g||'@ex.com','+001'||g FROM generate_series(1, :count) g;",
       "cleanupSql": "DELETE FROM viewer WHERE email LIKE 'bench_ins_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "viewer_delete_bulk", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench','del','bench_del_'||g||'@ex.com','+002'||g FROM generate_series(1, :count) g;",
       "sql": "DELETE FROM viewer WHERE email LIKE 'bench_del_%';",
-      "repeats": 3 },
+      "repeats": 7 },
 
     { "name": "movie_select_by_genre", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO movie (title,genre,duration_minutes,release_date,rating,age_restriction) SELECT 'bench_sel_m_'||g,'Comedy',100,'2020-01-01','PG-13',13 FROM generate_series(1,:count) g;",
       "sql": "SELECT COUNT(*) FROM movie WHERE genre = 'Comedy';",
       "cleanupSql": "DELETE FROM movie WHERE title LIKE 'bench_sel_m_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "movie_insert_bulk", "counts": [100, 1000, 5000],
       "sql": "INSERT INTO movie (title,genre,duration_minutes,release_date,rating,age_restriction) SELECT 'bench_ins_m_'||g,'Drama',110,'2021-01-01','PG-13',16 FROM generate_series(1,:count) g;",
       "cleanupSql": "DELETE FROM movie WHERE title LIKE 'bench_ins_m_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "movie_delete_bulk", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO movie (title,genre,duration_minutes,release_date,rating,age_restriction) SELECT 'bench_del_m_'||g,'Horror',95,'2019-01-01','R',18 FROM generate_series(1,:count) g;",
       "sql": "DELETE FROM movie WHERE title LIKE 'bench_del_m_%';",
-      "repeats": 3 },
+      "repeats": 7 },
 
     { "name": "cinema_select_city", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO cinema (name,address,phone_number,city) SELECT 'bench_c_'||g,'addr','+100'||g,'XCity' FROM generate_series(1,:count) g;",
       "sql": "SELECT COUNT(*) FROM cinema WHERE city = 'XCity';",
       "cleanupSql": "DELETE FROM cinema WHERE name LIKE 'bench_c_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "cinema_insert_bulk", "counts": [100, 1000, 5000],
       "sql": "INSERT INTO cinema (name,address,phone_number,city) SELECT 'bench_ci_'||g,'addr','+101'||g,'YCity' FROM generate_series(1,:count) g;",
       "cleanupSql": "DELETE FROM cinema WHERE name LIKE 'bench_ci_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "cinema_delete_bulk", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO cinema (name,address,phone_number,city) SELECT 'bench_cd_'||g,'addr','+102'||g,'ZCity' FROM generate_series(1,:count) g;",
       "sql": "DELETE FROM cinema WHERE name LIKE 'bench_cd_%';",
-      "repeats": 3 },
+      "repeats": 7 },
 
     { "name": "hall_select_by_seat_count", "counts": [100, 1000, 5000],
       "setupSql": "WITH base AS (SELECT COALESCE(min(cinema_id),0) AS id FROM cinema) INSERT INTO hall (cinema_id,hall_name,seat_count,base_ticket_price) SELECT (SELECT id FROM base),'bench_hs_'||g,100 + (g % 50), 10.50 FROM generate_series(1,:count) g;",
       "sql": "SELECT COUNT(*) FROM hall WHERE seat_count >= 100;",
       "cleanupSql": "DELETE FROM hall WHERE hall_name LIKE 'bench_hs_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "hall_insert_bulk", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO cinema (name,address,phone_number,city) VALUES ('bench_holder','a','+0','c') ON CONFLICT DO NOTHING;",
       "sql": "WITH c AS (SELECT min(cinema_id) AS id FROM cinema) INSERT INTO hall (cinema_id,hall_name,seat_count,base_ticket_price) SELECT (SELECT id FROM c),'bench_hi_'||g,120, 11.00 FROM generate_series(1,:count) g;",
       "cleanupSql": "DELETE FROM hall WHERE hall_name LIKE 'bench_hi_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "hall_delete_bulk", "counts": [100, 1000, 5000],
       "setupSql": "WITH c AS (SELECT min(cinema_id) AS id FROM cinema) INSERT INTO hall (cinema_id,hall_name,seat_count,base_ticket_price) SELECT (SELECT id FROM c),'bench_hd_'||g,130, 12.00 FROM generate_series(1,:count) g;",
       "sql": "DELETE FROM hall WHERE hall_name LIKE 'bench_hd_%';",
-      "repeats": 3 },
+      "repeats": 7 },
 
     { "name": "session_select_by_price", "counts": [100, 1000, 5000],
       "setupSql": "WITH m AS (SELECT COALESCE(min(movie_id),1) mid FROM movie), h AS (SELECT COALESCE(min(hall_id),1) hid FROM hall) INSERT INTO session (movie_id,hall_id,session_datetime,available_seats,final_price) SELECT (SELECT mid FROM m),(SELECT hid FROM h), now(), 100, 12.34 FROM generate_series(1,:count) g;",
       "sql": "SELECT COUNT(*) FROM session WHERE final_price >= 12.00;",
       "cleanupSql": "DELETE FROM session WHERE final_price = 12.34;",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "session_insert_bulk", "counts": [100, 1000, 5000],
       "setupSql": "WITH cnt AS (SELECT COUNT(*) c FROM movie) INSERT INTO movie (title,genre,duration_minutes,release_date,rating,age_restriction) SELECT 'bench_fill_m_'||g,'Action',100,'2020-01-01','PG-13',13 FROM generate_series(1, CASE WHEN (SELECT c FROM cnt)=0 THEN :count ELSE 0 END) g;",
       "sql": "WITH m AS (SELECT COALESCE(min(movie_id),1) mid FROM movie), h AS (SELECT COALESCE(min(hall_id),1) hid FROM hall) INSERT INTO session (movie_id,hall_id,session_datetime,available_seats,final_price) SELECT (SELECT mid FROM m),(SELECT hid FROM h), now(), 90, 15.00 FROM generate_series(1,:count) g;",
       "cleanupSql": "DELETE FROM session WHERE final_price = 15.00;",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "session_delete_bulk", "counts": [100, 1000, 5000],
       "setupSql": "WITH m AS (SELECT COALESCE(min(movie_id),1) mid FROM movie), h AS (SELECT COALESCE(min(hall_id),1) hid FROM hall) INSERT INTO session (movie_id,hall_id,session_datetime,available_seats,final_price) SELECT (SELECT mid FROM m),(SELECT hid FROM h), now(), 80, 19.99 FROM generate_series(1,:count) g;",
       "sql": "DELETE FROM session WHERE final_price = 19.99;",
-      "repeats": 3 },
+      "repeats": 7 },
 
     { "name": "viewer_profile_select", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench_vp', 's', 'bench_vp_'||g||'@ex.com','+003'||g FROM generate_series(1,:count) g; INSERT INTO viewer_profile (viewer_id, male_gender, nickname, birth_date) SELECT v.viewer_id, true, 'vp', '2000-01-01' FROM viewer v LEFT JOIN viewer_profile vp ON vp.viewer_id=v.viewer_id WHERE v.email LIKE 'bench_vp_%' AND vp.viewer_id IS NULL;",
       "sql": "SELECT COUNT(*) FROM viewer_profile WHERE nickname = 'vp';",
       "cleanupSql": "DELETE FROM viewer_profile WHERE nickname = 'vp'; DELETE FROM viewer WHERE email LIKE 'bench_vp_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "viewer_profile_insert", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench_vpi', 's', 'bench_vpi_'||g||'@ex.com','+004'||g FROM generate_series(1,:count*2) g;",
       "sql": "INSERT INTO viewer_profile (viewer_id, male_gender, nickname, birth_date) SELECT v.viewer_id, false, 'vpi', '2001-01-01' FROM viewer v LEFT JOIN viewer_profile vp ON vp.viewer_id=v.viewer_id WHERE v.email LIKE 'bench_vpi_%' AND vp.viewer_id IS NULL LIMIT :count;",
       "cleanupSql": "DELETE FROM viewer_profile WHERE nickname = 'vpi'; DELETE FROM viewer WHERE email LIKE 'bench_vpi_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "viewer_profile_delete", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench_vpd', 's', 'bench_vpd_'||g||'@ex.com','+005'||g FROM generate_series(1,:count) g; INSERT INTO viewer_profile (viewer_id, male_gender, nickname, birth_date) SELECT v.viewer_id, true, 'vpd', '2002-01-01' FROM viewer v WHERE v.email LIKE 'bench_vpd_%';",
       "sql": "DELETE FROM viewer_profile WHERE nickname = 'vpd';",
       "cleanupSql": "DELETE FROM viewer WHERE email LIKE 'bench_vpd_%';",
-      "repeats": 3 },
+      "repeats": 7 },
 
     { "name": "movie_review_select", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench_mr', 's', 'bench_mr_'||g||'@ex.com','+006'||g FROM generate_series(1,:count) g; INSERT INTO movie (title,genre,duration_minutes,release_date,rating,age_restriction) SELECT 'bench_mr_'||g,'Action',100,'2020-01-01','PG-13',13 FROM generate_series(1,:count) g; INSERT INTO movie_review (movie_id, viewer_id, rating, comment) SELECT m.movie_id, v.viewer_id, 7, 'mr_sel' FROM (SELECT movie_id FROM movie WHERE title LIKE 'bench_mr_%' LIMIT :count) m CROSS JOIN (SELECT viewer_id FROM viewer WHERE email LIKE 'bench_mr_%' LIMIT :count) v LIMIT :count;",
       "sql": "SELECT COUNT(*) FROM movie_review WHERE comment = 'mr_sel';",
       "cleanupSql": "DELETE FROM movie_review WHERE comment IN ('mr_sel','mr_ins','mr_del'); DELETE FROM movie WHERE title LIKE 'bench_mr_%'; DELETE FROM viewer WHERE email LIKE 'bench_mr_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "movie_review_insert", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench_mri', 's', 'bench_mri_'||g||'@ex.com','+007'||g FROM generate_series(1,:count) g; INSERT INTO movie (title,genre,duration_minutes,release_date,rating,age_restriction) SELECT 'bench_mri_'||g,'Drama',110,'2020-01-02','PG-13',16 FROM generate_series(1,:count) g;",
       "sql": "INSERT INTO movie_review (movie_id, viewer_id, rating, comment) SELECT m.movie_id, v.viewer_id, 8, 'mr_ins' FROM (SELECT movie_id FROM movie WHERE title LIKE 'bench_mri_%' LIMIT :count) m CROSS JOIN (SELECT viewer_id FROM viewer WHERE email LIKE 'bench_mri_%' LIMIT :count) v LIMIT :count;",
       "cleanupSql": "DELETE FROM movie_review WHERE comment = 'mr_ins'; DELETE FROM movie WHERE title LIKE 'bench_mri_%'; DELETE FROM viewer WHERE email LIKE 'bench_mri_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "movie_review_delete", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench_mrd', 's', 'bench_mrd_'||g||'@ex.com','+008'||g FROM generate_series(1,:count) g; INSERT INTO movie (title,genre,duration_minutes,release_date,rating,age_restriction) SELECT 'bench_mrd_'||g,'Horror',90,'2020-01-03','R',18 FROM generate_series(1,:count) g; INSERT INTO movie_review (movie_id, viewer_id, rating, comment) SELECT m.movie_id, v.viewer_id, 6, 'mr_del' FROM (SELECT movie_id FROM movie WHERE title LIKE 'bench_mrd_%' LIMIT :count) m CROSS JOIN (SELECT viewer_id FROM viewer WHERE email LIKE 'bench_mrd_%' LIMIT :count) v LIMIT :count;",
       "sql": "DELETE FROM movie_review WHERE comment = 'mr_del';",
       "cleanupSql": "DELETE FROM movie WHERE title LIKE 'bench_mrd_%'; DELETE FROM viewer WHERE email LIKE 'bench_mrd_%';",
-      "repeats": 3 },
+      "repeats": 7 },
 
     { "name": "ticket_select_join_viewer_session", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench_t', 's', 'bench_t_'||g||'@ex.com','+009'||g FROM generate_series(1,:count) g; WITH m AS (SELECT COALESCE(min(movie_id),1) mid FROM movie), h AS (SELECT COALESCE(min(hall_id),1) hid FROM hall) INSERT INTO session (movie_id,hall_id,session_datetime,available_seats,final_price) SELECT (SELECT mid FROM m),(SELECT hid FROM h), now(), 200, 25.00 FROM generate_series(1,:count) g; INSERT INTO ticket (session_id, viewer_id) SELECT s.session_id, v.viewer_id FROM (SELECT session_id FROM session WHERE final_price=25.00 LIMIT :count) s CROSS JOIN (SELECT viewer_id FROM viewer WHERE email LIKE 'bench_t_%' LIMIT :count) v LIMIT :count;",
       "sql": "SELECT COUNT(*) FROM ticket t JOIN session s ON t.session_id = s.session_id JOIN viewer v ON t.viewer_id = v.viewer_id WHERE s.final_price = 25.00 AND v.email LIKE 'bench_t_%';",
       "cleanupSql": "DELETE FROM ticket t USING session s WHERE t.session_id=s.session_id AND s.final_price=25.00; DELETE FROM session WHERE final_price=25.00; DELETE FROM viewer WHERE email LIKE 'bench_t_%';",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "session_join_movie", "counts": [100, 1000, 5000],
       "setupSql": "WITH m AS (SELECT COALESCE(min(movie_id),1) mid FROM movie), h AS (SELECT COALESCE(min(hall_id),1) hid FROM hall) INSERT INTO session (movie_id,hall_id,session_datetime,available_seats,final_price) SELECT (SELECT mid FROM m),(SELECT hid FROM h), now(), 150, 30.00 FROM generate_series(1,:count) g;",
       "sql": "SELECT COUNT(*) FROM session s JOIN movie m ON s.movie_id = m.movie_id WHERE s.final_price = 30.00;",
       "cleanupSql": "DELETE FROM session WHERE final_price = 30.00;",
-      "repeats": 3 },
-
+      "repeats": 7 },
     { "name": "hall_join_cinema", "counts": [100, 1000, 5000],
       "setupSql": "INSERT INTO cinema (name,address,phone_number,city) SELECT 'bench_hc_'||g,'x','+200'||g,'HC' FROM generate_series(1,:count) g; INSERT INTO hall (cinema_id,hall_name,seat_count,base_ticket_price) SELECT c.cinema_id,'bench_hc_'||c.cinema_id, 120, 9.99 FROM (SELECT cinema_id FROM cinema WHERE name LIKE 'bench_hc_%' LIMIT :count) c;",
       "sql": "SELECT COUNT(*) FROM hall h JOIN cinema c ON h.cinema_id=c.cinema_id WHERE c.name LIKE 'bench_hc_%';",
       "cleanupSql": "DELETE FROM hall WHERE hall_name LIKE 'bench_hc_%'; DELETE FROM cinema WHERE name LIKE 'bench_hc_%';",
-      "repeats": 3 }
-  ],
-  "indexSettings": [
-    { "table": "viewer", "columns": ["email"], "indexType": "btree" }
+      "repeats": 7 },
+
+    { "name": "ticket_insert_bulk", "counts": [100, 1000, 5000],
+      "setupSql": "WITH m AS (SELECT COALESCE(min(movie_id),0) mid FROM movie), h AS (SELECT COALESCE(min(hall_id),0) hid FROM hall), c AS (SELECT COALESCE(min(cinema_id),0) cid FROM cinema) INSERT INTO cinema (name,address,phone_number,city) SELECT 'bench_ti_c','a','+0','tc' WHERE (SELECT cid FROM c)=0; INSERT INTO hall (cinema_id,hall_name,seat_count,base_ticket_price) SELECT (SELECT min(cinema_id) FROM cinema),'bench_ti_h',5000,10.00 WHERE (SELECT COUNT(*) FROM hall)=0; INSERT INTO movie (title,genre,duration_minutes,release_date,rating,age_restriction) SELECT 'bench_ti_m','Action',100,'2020-01-01','PG-13',13 WHERE (SELECT mid FROM m)=0; INSERT INTO session (movie_id,hall_id,session_datetime,available_seats,final_price) SELECT (SELECT min(movie_id) FROM movie),(SELECT min(hall_id) FROM hall), now(), 100000, 77.77 WHERE (SELECT COUNT(*) FROM session WHERE final_price=77.77)=0; INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench_ti','u','bench_ti_'||g||'@ex.com','+310'||g FROM generate_series(1,:count) g;",
+      "sql": "INSERT INTO ticket (session_id, viewer_id) SELECT s.session_id, v.viewer_id FROM (SELECT session_id FROM session WHERE final_price=77.77 LIMIT 1) s JOIN (SELECT viewer_id FROM viewer WHERE email LIKE 'bench_ti_%' LIMIT :count) v ON 1=1;",
+      "cleanupSql": "DELETE FROM ticket USING viewer WHERE ticket.viewer_id=viewer.viewer_id AND viewer.email LIKE 'bench_ti_%'; DELETE FROM viewer WHERE email LIKE 'bench_ti_%';",
+      "repeats": 7 },
+    { "name": "ticket_delete_bulk", "counts": [100, 1000, 5000],
+      "setupSql": "WITH m AS (SELECT COALESCE(min(movie_id),0) mid FROM movie), h AS (SELECT COALESCE(min(hall_id),0) hid FROM hall), c AS (SELECT COALESCE(min(cinema_id),0) cid FROM cinema) INSERT INTO cinema (name,address,phone_number,city) SELECT 'bench_td_c','a','+0','tc' WHERE (SELECT cid FROM c)=0; INSERT INTO hall (cinema_id,hall_name,seat_count,base_ticket_price) SELECT (SELECT min(cinema_id) FROM cinema),'bench_td_h',5000,10.00 WHERE (SELECT COUNT(*) FROM hall)=0; INSERT INTO movie (title,genre,duration_minutes,release_date,rating,age_restriction) SELECT 'bench_td_m','Drama',90,'2020-01-02','PG-13',13 WHERE (SELECT mid FROM m)=0; INSERT INTO session (movie_id,hall_id,session_datetime,available_seats,final_price) SELECT (SELECT min(movie_id) FROM movie),(SELECT min(hall_id) FROM hall), now(), 100000, 88.88 WHERE (SELECT COUNT(*) FROM session WHERE final_price=88.88)=0; INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench_td','u','bench_td_'||g||'@ex.com','+311'||g FROM generate_series(1,:count) g; INSERT INTO ticket (session_id, viewer_id) SELECT s.session_id, v.viewer_id FROM (SELECT session_id FROM session WHERE final_price=88.88 LIMIT 1) s CROSS JOIN (SELECT viewer_id FROM viewer WHERE email LIKE 'bench_td_%' LIMIT :count) v LIMIT :count;",
+      "sql": "DELETE FROM ticket USING viewer WHERE ticket.viewer_id=viewer.viewer_id AND viewer.email LIKE 'bench_td_%';",
+      "cleanupSql": "DELETE FROM viewer WHERE email LIKE 'bench_td_%';",
+      "repeats": 7 },
+
+    { "name": "viewer_profile_join_series", "counts": [100, 1000, 5000],
+      "setupSql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench_vj', 'x', 'bench_vj_'||g||'@ex.com','+401'||g FROM generate_series(1,:count) g; INSERT INTO viewer_profile (viewer_id, male_gender, nickname, birth_date) SELECT v.viewer_id, true, 'vj', '2000-02-02' FROM viewer v LEFT JOIN viewer_profile vp ON vp.viewer_id=v.viewer_id WHERE v.email LIKE 'bench_vj_%' AND vp.viewer_id IS NULL;",
+      "sql": "SELECT COUNT(*) FROM viewer_profile vp JOIN viewer v ON vp.viewer_id=v.viewer_id WHERE v.email LIKE 'bench_vj_%';",
+      "cleanupSql": "DELETE FROM viewer_profile WHERE nickname = 'vj'; DELETE FROM viewer WHERE email LIKE 'bench_vj_%';",
+      "repeats": 7 },
+    { "name": "favorite_movies_join_series", "counts": [100, 1000, 5000],
+      "setupSql": "INSERT INTO viewer (first_name,last_name,email,phone_number) SELECT 'bench_favv','x','bench_favv_'||g||'@ex.com','+501'||g FROM generate_series(1,:count) g; INSERT INTO movie (title,genre,duration_minutes,release_date,rating,age_restriction) SELECT 'bench_favm_'||g,'Action',100,'2020-01-01','PG-13',13 FROM generate_series(1,:count) g; INSERT INTO favorite_movies (viewer_id,movie_id) SELECT v.viewer_id,m.movie_id FROM (SELECT viewer_id FROM viewer WHERE email LIKE 'bench_favv_%' LIMIT :count) v JOIN (SELECT movie_id FROM movie WHERE title LIKE 'bench_favm_%' LIMIT :count) m ON 1=1 WHERE NOT EXISTS (SELECT 1 FROM favorite_movies fm WHERE fm.viewer_id=v.viewer_id AND fm.movie_id=m.movie_id) LIMIT :count;",
+      "sql": "SELECT COUNT(*) FROM favorite_movies fm JOIN viewer v ON fm.viewer_id=v.viewer_id JOIN movie m ON fm.movie_id=m.movie_id WHERE v.email LIKE 'bench_favv_%' AND m.title LIKE 'bench_favm_%';",
+      "cleanupSql": "DELETE FROM favorite_movies WHERE favorite_id IN (SELECT fm.favorite_id FROM favorite_movies fm JOIN viewer v ON fm.viewer_id=v.viewer_id WHERE v.email LIKE 'bench_favv_%'); DELETE FROM movie WHERE title LIKE 'bench_favm_%'; DELETE FROM viewer WHERE email LIKE 'bench_favv_%';",
+      "repeats": 7 }
   ],
   "customSettings": {
     "researchQueries": [
       {"name": "count_halls", "sql": "SELECT COUNT(*) FROM hall", "repeats": 2}
     ]
   },
-  "joinSettings": [
-    {
-      "name": "hall_join_cinema",
-      "leftTable": "hall",
-      "rightTable": "cinema",
-      "joinCondition": "hall.cinema_id = cinema.cinema_id",
-      "repeats": 3
-    },
-    {
-      "name": "session_join_movie",
-      "leftTable": "session",
-      "rightTable": "movie",
-      "joinCondition": "session.movie_id = movie.movie_id",
-      "repeats": 3
-    },
-    {
-      "name": "session_join_hall",
-      "leftTable": "session",
-      "rightTable": "hall",
-      "joinCondition": "session.hall_id = hall.hall_id",
-      "repeats": 3
-    },
-    {
-      "name": "ticket_join_session",
-      "leftTable": "ticket",
-      "rightTable": "session",
-      "joinCondition": "ticket.session_id = session.session_id",
-      "repeats": 3
-    },
-    {
-      "name": "ticket_join_viewer",
-      "leftTable": "ticket",
-      "rightTable": "viewer",
-      "joinCondition": "ticket.viewer_id = viewer.viewer_id",
-      "repeats": 3
-    },
-    {
-      "name": "viewer_profile_join_viewer",
-      "leftTable": "viewer_profile",
-      "rightTable": "viewer",
-      "joinCondition": "viewer_profile.viewer_id = viewer.viewer_id",
-      "repeats": 3
-    },
-    {
-      "name": "movie_review_join_movie",
-      "leftTable": "movie_review",
-      "rightTable": "movie",
-      "joinCondition": "movie_review.movie_id = movie.movie_id",
-      "repeats": 3
-    },
-    {
-      "name": "movie_review_join_viewer",
-      "leftTable": "movie_review",
-      "rightTable": "viewer",
-      "joinCondition": "movie_review.viewer_id = viewer.viewer_id",
-      "repeats": 3
-    },
-    {
-      "name": "complex_session_join",
-      "leftTable": "session s JOIN movie m ON s.movie_id = m.movie_id JOIN hall h ON s.hall_id = h.hall_id",
-      "rightTable": "cinema c",
-      "joinCondition": "h.cinema_id = c.cinema_id",
-      "repeats": 3
-    }
-  ]
+  "indexResearch": {},
+  "simpleDb": {
+    "rowCounts": [1000, 5000, 10000],
+    "repeats": 3
+  }
 }

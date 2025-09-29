@@ -4,43 +4,54 @@ import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from joinAnalysis import analyzeJoinPerformance
-from lib.tableModels import recreateAllTables
-from lib.randomDataGenerator import RandomDataGenerator
+from benchmarks.queryPerformance import measureQueryPerformance
+from lib.db.models import recreateAllTables
+from lib.data.generators import RandomDataGenerator
+from lib.db.connection import getDbConnection
 
-def testJoinAnalysis():
-    print("Recreating database...")
-    recreateAllTables(verbose=False)
+def _prepareBaseData():
+    gen = RandomDataGenerator()
+    # Базовые наборы (небольшие) чтобы были FK-родители
+    with getDbConnection() as (conn, cur):
+        gen._generateCinemasAndHalls(cur, cinemasCount=5, hallsPerCinema=2)
+        gen._generateMovies(cur, 10)
+        gen._generateViewers(cur, 10)
 
-    print("Generating test data...")
-    generator = RandomDataGenerator()
-    generator.generateData(100, 100, 5, 2, 3, 0.1, 0.1, 0.1)
 
-    print("Loading join configuration...")
-    configPath = os.path.join(os.path.dirname(__file__), 'paramsSettings.json')
+def testJoinQueries():
+    print("Recreating database (with indexes)...")
+    recreateAllTables(withIndexes=True)
+    print("Generating base parent data for FK ...")
+    _prepareBaseData()
+
+    configPath = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'paramsSettings.json')
+    if not os.path.exists(configPath):
+        print('Config not found:', configPath)
+        return
     with open(configPath, 'r', encoding='utf-8') as f:
         config = json.load(f)
-
-    joinConfig = config.get('joinSettings', [])
-    print(f"Found {len(joinConfig)} join configurations")
-
-    if len(joinConfig) > 0:
-        print("First join config:", joinConfig[0])
-
-    testCsvPath = os.path.join(os.path.dirname(__file__), 'test_join_results.csv')
-    print(f"Running JOIN analysis, output to: {testCsvPath}")
-
-    analyzeJoinPerformance(joinConfig, testCsvPath)
-
-    print("Checking if file was created...")
-    if os.path.exists(testCsvPath):
-        with open(testCsvPath, 'r', encoding='utf-8') as f:
+    allQueries = config.get('queries', [])
+    joinQueries = []
+    for q in allQueries:
+        name = q.get('name', '')
+        # эвристика: берём все запросы где есть 'join' в имени
+        if 'join' in name.lower():
+            joinQueries.append(q)
+    if len(joinQueries) == 0:
+        print('No join queries detected in configuration.')
+        return
+    print('Detected join queries:', [q.get('name') for q in joinQueries])
+    resultsDir = os.path.join(os.path.dirname(__file__))
+    csvPath = os.path.join(resultsDir, 'test_join_results.csv')
+    imgDir = os.path.join(resultsDir, 'test_join_images')
+    measureQueryPerformance(joinQueries, csvPath, imgDir)
+    if os.path.exists(csvPath):
+        with open(csvPath, 'r', encoding='utf-8') as f:
             content = f.read()
-            print(f"File size: {len(content)} characters")
-            print("File content:")
-            print(content)
+        print('Join benchmark CSV size:', len(content), 'bytes')
+        print('First 300 chars:\n', content[:300])
     else:
-        print("File was NOT created!")
+        print('Join benchmark CSV not created')
 
 if __name__ == '__main__':
-    testJoinAnalysis()
+    testJoinQueries()

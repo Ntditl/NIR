@@ -2,6 +2,9 @@ import psycopg2
 from contextlib import contextmanager
 import os
 
+CONFIG_FILE_NAME = 'configsettings.txt'
+
+
 def _readConfig(configPath):
     config = {}
     with open(configPath, 'r', encoding='utf-8') as fileObj:
@@ -16,7 +19,10 @@ def _readConfig(configPath):
 
 @contextmanager
 def getDbConnection():
-    configPath = os.path.join(os.path.dirname(__file__), '..', 'configsettings.txt')
+    baseDir = os.path.dirname(__file__)
+    configPath = os.path.abspath(os.path.join(baseDir, '..', '..', CONFIG_FILE_NAME))
+    if not os.path.isfile(configPath):
+        raise FileNotFoundError('Config file not found at: ' + configPath)
     config = _readConfig(configPath)
     databaseConfig = {
         "user": config.get("user"),

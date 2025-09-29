@@ -8,14 +8,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lib.db.connection import getDbConnection
 from lib.db.models import getCreateTablesSql
 from benchmarks.generationSpeed import measureGenerationSpeed
-from benchmarks.queryPerformance import measureQueryPerformance
-from benchmarks.indexCinema import runIndexBenchmarks
-from experiments.customDbResearch import runCustomDbResearch
-from experiments.indexResearch import runIndexResearch
-from benchmarks.simpleDbIndexBench import runSimpleDbIndexBench
+from benchmarks.newResearch import runAllResearch
 
 
-def runBenchmarks(configPath: str) -> None:
+def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, disableFts: bool) -> None:
     with getDbConnection() as (conn, cur):
         tableNames = [
             "ticket", "session", "hall", "cinema", "movie_review",
@@ -57,52 +53,43 @@ def runBenchmarks(configPath: str) -> None:
         outputImagePath=generationImagePath
     )
 
-    queriesConfig = config.get('queries', [])
-    queryResultsPath = os.path.join(resultsDir, 'query_performance.csv')
-    queryImageDir = os.path.join(resultsDir, 'query_images')
-    print("Измеряю производительность запросов →", queryResultsPath, "и изображения →", queryImageDir)
-    measureQueryPerformance(
-        queriesConfig=queriesConfig,
-        outputCsvPath=queryResultsPath,
-        outputImageDir=queryImageDir
+    print("Запускаю исследования: DELETE, JOIN, PK, строковый индекс, FTS →", resultsDir)
+    runAllResearch(
+        outputDir=resultsDir,
+        raster=True,
+        includePkExperiment=(not disablePk),
+        includeStringIndexExperiment=(not disableStringIndex),
+        includeFtsExperiment=(not disableFts)
     )
 
-    print("Запускаю бенчмарки индексов (полный набор) → index_bench")
-    runIndexBenchmarks()
-
-    customConfig = config.get('customSettings', {})
-    customResultsPath = os.path.join(resultsDir, 'custom_db_research.csv')
-    print("Запускаю исследование собственной СУБД →", customResultsPath)
-    runCustomDbResearch(
-        researchConfig=customConfig,
-        outputCsvPath=customResultsPath
-    )
-
-    indexResearchConfig = config.get('indexResearch', {})
-    indexResearchDir = os.path.join(resultsDir, 'index_research')
-    print("Запускаю пакет детального исследования индексов →", indexResearchDir)
-    runIndexResearch(indexResearchConfig, indexResearchDir)
-
-    simpleDbConfig = config.get('simpleDb', {})
-    simpleDbDir = os.path.join(resultsDir, 'simpledb')
-    print("Запускаю бенчмарки индексации SimpleDB →", simpleDbDir)
-    rowCounts = simpleDbConfig.get('rowCounts', [1000, 5000, 10000])
-    repeats = int(simpleDbConfig.get('repeats', 3))
-    runSimpleDbIndexBench(simpleDbDir, rowCounts=rowCounts, repeats=repeats)
-
-    print("Все бенчмарки завершены. Результаты сохранены в:", resultsDir)
+    print("Все исследования завершены. Результаты сохранены в:", resultsDir)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Запуск полного набора исследований производительности БД."
+        description="Запуск исследований производительности БД (генерация + операции + PK + строковый индекс + FTS)."
     )
     defaultConfigPath = os.path.join(os.path.dirname(__file__), 'paramsSettings.json')
     parser.add_argument(
         '-c', '--config',
         type=str,
         default=defaultConfigPath,
-        help="Путь к JSON-файлу конфигурации с параметрами бенчмарков."
+        help="Путь к JSON-файлу конфигурации."
+    )
+    parser.add_argument(
+        '--no-pk',
+        action='store_true',
+        help='Отключить эксперимент с первичным ключом (по умолчанию включен)'
+    )
+    parser.add_argument(
+        '--no-string-index',
+        action='store_true',
+        help='Отключить эксперимент со строковым индексом (по умолчанию включен)'
+    )
+    parser.add_argument(
+        '--no-fts',
+        action='store_true',
+        help='Отключить FTS эксперимент (по умолчанию включен)'
     )
     args = parser.parse_args()
-    runBenchmarks(args.config)
+    runBenchmarks(args.config, args.no_pk, args.no_string_index, args.no_fts)

@@ -1,12 +1,16 @@
 import os
 import matplotlib.pyplot as plt
 
+TITLE_FONT_SCALE = 2.0
+AXIS_LABEL_FONT_SCALE = 1.4
+
 class PlotBuilder:
     def __init__(self, saveDirectory: str = 'plots'):
         self.saveDirectory = saveDirectory
         os.makedirs(self.saveDirectory, exist_ok=True)
-        self.colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
-        self.linestyles = ['-', '--', '-.', ':']
+        # новые цвета в фиксированном порядке
+        self.colors = ["red", "green", "orange", "blue", "brown", "pink"]
+        self.linestyles = ['-']  # один стиль чтобы не дублировать цвет
         self.markers = ['o', 's', 'v', '^', '<', '>', 'p', '*', 'D']
 
     def buildChart(
@@ -18,34 +22,25 @@ class PlotBuilder:
         fileName: str = 'chart',
         isRaster: bool = False
     ):
+        baseFontSize = plt.rcParams.get('font.size', 10)
+        titleFontSize = int(baseFontSize * TITLE_FONT_SCALE)
+        axisFontSize = int(baseFontSize * AXIS_LABEL_FONT_SCALE)
         fig, ax = plt.subplots(figsize=(12, 8))
         seriesItems = list(series.items())
-        usedCombos = []
         for i in range(len(seriesItems)):
             label, data = seriesItems[i]
             xValues, yValues = data
-            comboFound = False
-            for c in self.colors:
-                if comboFound:
-                    break
-                for ls in self.linestyles:
-                    if (c, ls) not in usedCombos:
-                        color = c
-                        linestyle = ls
-                        usedCombos.append((c, ls))
-                        comboFound = True
-                        break
-            if not comboFound:
-                color = self.colors[i % len(self.colors)]
-                linestyle = self.linestyles[i % len(self.linestyles)]
+            color = self.colors[i % len(self.colors)]
+            linestyle = '-'
             marker = None
             if len(xValues) < 10:
                 marker = self.markers[i % len(self.markers)]
             ax.plot(xValues, yValues, label=label, color=color, linestyle=linestyle, marker=marker)
-        ax.set_title(chartTitle)
-        ax.set_xlabel(xAxisLabel)
-        ax.set_ylabel(yAxisLabel)
-        ax.legend()
+        ax.set_title(chartTitle, fontsize=titleFontSize)
+        ax.set_xlabel(xAxisLabel, fontsize=axisFontSize)
+        ax.set_ylabel(yAxisLabel, fontsize=axisFontSize)
+        ax.tick_params(labelsize=axisFontSize)
+        ax.legend(fontsize=axisFontSize)
         ax.grid(True)
         extension = 'png' if isRaster else 'svg'
         filePath = os.path.join(self.saveDirectory, f"{fileName}.{extension}")

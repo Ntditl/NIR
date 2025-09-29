@@ -6,6 +6,10 @@ from lib.db.connection import getDbConnection
 from lib.visualization.plots import PlotBuilder
 
 REPEATS = 3
+FAST_THRESHOLD = 0.01
+MEDIUM_THRESHOLD = 0.1
+CATEGORIES_CSV_NAME = 'generation_speed_categories.csv'
+ROW_COUNTS_SINGLE_START = [5, 50, 100, 150, 200, 250,300,350,400,450]
 
 
 def _getColumnsInfo(tableName):
@@ -89,45 +93,82 @@ def _measureGenerateSingle(table, n):
     def run():
         _generateTableRows(table, n)
     arr = timeit.repeat('run()', repeat=REPEATS, number=1, globals=locals())
-    best = arr[0]
-    i = 1
-    while i < len(arr):
-        if arr[i] < best:
-            best = arr[i]
-        i = i + 1
-    return best
+    total = 0.0
+    for v in arr:
+        total = total + v
+    avg = total / len(arr)
+    return avg
 
 
 def _measureGenerateGroup(sequence, n):
     def run():
         _generateRelatedGroup(sequence, n)
     arr = timeit.repeat('run()', repeat=REPEATS, number=1, globals=locals())
-    best = arr[0]
-    i = 1
-    while i < len(arr):
-        if arr[i] < best:
-            best = arr[i]
-        i = i + 1
-    return best
+    total = 0.0
+    for v in arr:
+        total = total + v
+    avg = total / len(arr)
+    return avg
 
 
-def _saveSingleCharts(resultsSingle, resultsGroups, baseDir, isRaster):
-    builder = PlotBuilder(baseDir)
-    for table, series in resultsSingle.items():
+
+
+def _categorizeSeries(allSeries):
+    fast = {}
+    medium = {}
+    slow = {}
+    for name in allSeries:
+        series = allSeries[name]
+        lastPoint = series[len(series) - 1]
+        characteristicTime = lastPoint[1]
+        if characteristicTime <= FAST_THRESHOLD:
+            fast[name] = series
+        elif characteristicTime <= MEDIUM_THRESHOLD:
+            medium[name] = series
+        else:
+            slow[name] = series
+    return fast, medium, slow
+
+
+def _saveCategoryCombined(categories, outDir, isRaster):
+    builder = PlotBuilder(outDir)
+    fast = categories[0]
+    medium = categories[1]
+    slow = categories[2]
+    if len(medium) > 0:
+        builder.buildChart(_convertSeriesDict(medium), 'Графики времени генерации данных для всех таблиц', 'Строки', 'Время (с)', 'generation_speed_medium', isRaster)
+    if len(slow) > 0:
+        builder.buildChart(_convertSeriesDict(slow), 'Графики времени генерации данных для всех таблиц', 'Строки', 'Время (с)', 'generation_speed_slow', isRaster)
+
+
+def _convertSeriesDict(seriesDict):
+    converted = {}
+    for name in seriesDict:
+        series = seriesDict[name]
         xs = []
         ys = []
         for point in series:
             xs.append(point[0])
             ys.append(point[1])
-        builder.buildChart({table: (xs, ys)}, 'Generation ' + table, 'Rows', 'Time (s)', 'generation_' + table, isRaster)
-    for group, series in resultsGroups.items():
-        xs = []
-        ys = []
-        for point in series:
-            xs.append(point[0])
-            ys.append(point[1])
-        safeName = group.replace(' ', '_')
-        builder.buildChart({group: (xs, ys)}, 'Generation group ' + group, 'Rows', 'Time (s)', 'generation_group_' + safeName, isRaster)
+        converted[name] = (xs, ys)
+    return converted
+
+
+def _writeCategoriesCsv(path, fast, medium, slow):
+    with open(path, 'w', newline='', encoding='utf-8') as csvf:
+        csvf.write('subject,category,rows,time_seconds\n')
+        for name in fast:
+            series = fast[name]
+            for point in series:
+                csvf.write(f"{name},fast,{point[0]},{point[1]:.6f}\n")
+        for name in medium:
+            series = medium[name]
+            for point in series:
+                csvf.write(f"{name},medium,{point[0]},{point[1]:.6f}\n")
+        for name in slow:
+            series = slow[name]
+            for point in series:
+                csvf.write(f"{name},slow,{point[0]},{point[1]:.6f}\n")
 
 
 def measureGenerationSpeed(
@@ -138,47 +179,57 @@ def measureGenerationSpeed(
     selectedTables = []
     if isinstance(tablesConfig, dict):
         for k in tablesConfig:
-            if tablesConfig.get(k):
-                selectedTables.append(k)
+            if k != 'rowCounts' and k != 'fkGroups':
+                if tablesConfig.get(k):
+                    selectedTables.append(k)
     else:
         for name in tablesConfig:
             selectedTables.append(name)
-    rowCounts = [100, 500, 1000, 5000, 10000]
-    if isinstance(tablesConfig, dict):
-        if 'rowCounts' in tablesConfig:
-            rowCounts = tablesConfig['rowCounts']
+    rowCounts = ROW_COUNTS_SINGLE_START
     fkGroups = []
     if isinstance(tablesConfig, dict):
         if 'fkGroups' in tablesConfig:
             fkGroups = tablesConfig['fkGroups']
 
+    print('Старт измерений генерации. Таблиц', len(selectedTables), 'групп', len(fkGroups), 'ряды', rowCounts, flush=True)
+
     resultsSingle = {}
     for table in selectedTables:
+        print('Таблица', table, 'замер начинается', flush=True)
         times = []
         for n in rowCounts:
+            print('  rows', n, '→', 'начало', flush=True)
             elapsed = _measureGenerateSingle(table, n)
+            print('  rows', n, 'готово среднее время', f'{elapsed:.6f}', flush=True)
             times.append((n, elapsed))
         resultsSingle[table] = times
+        print('Таблица', table, 'завершена', flush=True)
 
     resultsGroups = {}
     for idx, groupDef in enumerate(fkGroups):
         name = groupDef.get('name', 'group_' + str(idx))
         sequence = groupDef.get('tables', [])
+        print('Группа', name, 'таблиц', sequence, 'замер начинается', flush=True)
         times = []
         for n in rowCounts:
+            print('  rows', n, '→', 'начало', flush=True)
             elapsed = _measureGenerateGroup(sequence, n)
+            print('  rows', n, 'готово среднее время', f'{elapsed:.6f}', flush=True)
             times.append((n, elapsed))
         resultsGroups[name] = times
+        print('Группа', name, 'завершена', flush=True)
 
     outDir = os.path.dirname(outputCsvPath)
     if outDir != "" and not os.path.isdir(outDir):
         os.makedirs(outDir, exist_ok=True)
     with open(outputCsvPath, 'w', newline='', encoding='utf-8') as csvf:
         csvf.write('subject,rows,time_seconds\n')
-        for table, series in resultsSingle.items():
+        for table in resultsSingle:
+            series = resultsSingle[table]
             for point in series:
                 csvf.write(f"{table},{point[0]},{point[1]:.6f}\n")
-        for group, series in resultsGroups.items():
+        for group in resultsGroups:
+            series = resultsGroups[group]
             for point in series:
                 csvf.write(f"{group},{point[0]},{point[1]:.6f}\n")
 
@@ -190,22 +241,30 @@ def measureGenerationSpeed(
         ext = os.path.splitext(outputImagePath)[1].lower()
         if ext in ['.png', '.jpg', '.jpeg']:
             isRaster = True
-        _saveSingleCharts(resultsSingle, resultsGroups, outDir, isRaster)
-        builder = PlotBuilder(outDir)
+        # индивидуальные графики отключены
         combined = {}
-        for table, series in resultsSingle.items():
+        for table in resultsSingle:
+            series = resultsSingle[table]
             xs = []
             ys = []
             for point in series:
                 xs.append(point[0])
                 ys.append(point[1])
             combined[table] = (xs, ys)
-        for group, series in resultsGroups.items():
+        for group in resultsGroups:
+            series = resultsGroups[group]
             xs = []
             ys = []
             for point in series:
                 xs.append(point[0])
                 ys.append(point[1])
             combined[group] = (xs, ys)
-        baseName = os.path.splitext(os.path.basename(outputImagePath))[0]
-        builder.buildChart(combined, 'Generation Time (in-memory)', 'Rows', 'Time (s)', baseName, isRaster)
+        allSeries = {}
+        for k in resultsSingle:
+            allSeries[k] = resultsSingle[k]
+        for k in resultsGroups:
+            allSeries[k] = resultsGroups[k]
+        fast, medium, slow = _categorizeSeries(allSeries)
+        _saveCategoryCombined((fast, medium, slow), outDir, isRaster)
+        categoriesCsvPath = os.path.join(outDir, CATEGORIES_CSV_NAME)
+        _writeCategoriesCsv(categoriesCsvPath, fast, medium, slow)

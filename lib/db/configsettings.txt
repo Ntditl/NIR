@@ -1,0 +1,6 @@
+user=postgres
+password=ProgIng22
+host=localhost
+port=5432
+dbname=nir1
+

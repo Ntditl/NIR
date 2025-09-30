@@ -1,0 +1,1 @@
+{"table": "str_plain", "columns": [{"name": "id", "type": "INT"}, {"name": "name", "type": "VARCHAR", "max": 32}]}

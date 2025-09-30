@@ -8,9 +8,8 @@ class PlotBuilder:
     def __init__(self, saveDirectory: str = 'plots'):
         self.saveDirectory = saveDirectory
         os.makedirs(self.saveDirectory, exist_ok=True)
-        # новые цвета в фиксированном порядке
-        self.colors = ["red", "green", "orange", "blue", "brown", "pink"]
-        self.linestyles = ['-']  # один стиль чтобы не дублировать цвет
+        self.colors = ["red", "green", "orange", "blue", "brown", "pink", "purple", "cyan"]
+        self.linestyles = ['-', '--', '-.', ':']
         self.markers = ['o', 's', 'v', '^', '<', '>', 'p', '*', 'D']
 
     def buildChart(
@@ -48,7 +47,7 @@ class PlotBuilder:
                         fixedY.append(v)
                 yValues = fixedY
             color = self.colors[i % len(self.colors)]
-            linestyle = '-'
+            linestyle = self.linestyles[i % len(self.linestyles)]
             marker = None
             if len(xValues) < 10:
                 marker = self.markers[i % len(self.markers)]

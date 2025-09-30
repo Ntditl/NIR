@@ -11,13 +11,15 @@ ROW_COUNTS = [100, 300, 600, 850, 1000]
 REPEATS = 3
 QUERIES_PER_RUN = 100
 RANDOM_SEED = 12345
-DATA_DIR = 'simpledb_bench_data'
+BASE_TEMP_DIR = os.path.join(os.path.dirname(__file__), 'foldersForSimpleDb')
+DATA_DIR = os.path.join(BASE_TEMP_DIR, 'select_number')
 CSV_FILE = 'simpledb_select_number.csv'
 PLOT_FILE = 'simpledb_select_number'
 
 random.seed(RANDOM_SEED)
 
 def clearDataDir():
+    os.makedirs(BASE_TEMP_DIR, exist_ok=True)
     if os.path.isdir(DATA_DIR):
         shutil.rmtree(DATA_DIR)
     os.makedirs(DATA_DIR, exist_ok=True)

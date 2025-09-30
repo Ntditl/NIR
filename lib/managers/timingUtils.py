@@ -1,5 +1,5 @@
 import timeit
-from .databaseConnection import getDbConnection
+from lib.db.connection import getDbConnection
 
 class TimingUtils:
     @staticmethod

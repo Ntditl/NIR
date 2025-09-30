@@ -9,9 +9,11 @@ from lib.db.connection import getDbConnection
 from lib.db.models import getCreateTablesSql
 from benchmarks.generationSpeed import measureGenerationSpeed
 from benchmarks.newResearch import runAllResearch
+from benchmarks.simpledb_select_number import runSimpleDbSelectNumber
+from benchmarks.simpledb_select_string import runSimpleDbSelectString
 
 
-def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, disableFts: bool) -> None:
+def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, disableFts: bool, disableSimpleDb: bool) -> None:
     with getDbConnection() as (conn, cur):
         tableNames = [
             "ticket", "session", "hall", "cinema", "movie_review",
@@ -62,12 +64,18 @@ def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, di
         includeFtsExperiment=(not disableFts)
     )
 
+    if not disableSimpleDb:
+        print("SimpleDB: SELECT WHERE по числовому полю (с индексом и без) →", resultsDir)
+        runSimpleDbSelectNumber(resultsDir, True)
+        print("SimpleDB: SELECT WHERE по строковому полю (с индексом и без) →", resultsDir)
+        runSimpleDbSelectString(resultsDir, True)
+
     print("Все исследования завершены. Результаты сохранены в:", resultsDir)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Запуск исследований производительности БД (генерация + операции + PK + строковый индекс + FTS)."
+        description="Запуск исследований производительности БД (генерация + операции + PK + строковый индекс + FTS + SimpleDB)."
     )
     defaultConfigPath = os.path.join(os.path.dirname(__file__), 'paramsSettings.json')
     parser.add_argument(
@@ -91,5 +99,10 @@ if __name__ == "__main__":
         action='store_true',
         help='Отключить FTS эксперимент (по умолчанию включен)'
     )
+    parser.add_argument(
+        '--no-simpledb',
+        action='store_true',
+        help='Отключить эксперимент SimpleDB (по умолчанию включен)'
+    )
     args = parser.parse_args()
-    runBenchmarks(args.config, args.no_pk, args.no_string_index, args.no_fts)
+    runBenchmarks(args.config, args.no_pk, args.no_string_index, args.no_fts, args.no_simpledb)

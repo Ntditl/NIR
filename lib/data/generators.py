@@ -15,6 +15,13 @@ class RandomDataGenerator:
     def __init__(self):
         self.generatedHallIds = []
         self.usedEmails = set()
+        self.schemaPrefix = ""
+
+    def setSchemaPrefix(self, prefix: str):
+        self.schemaPrefix = prefix
+
+    def _getTableName(self, tableName: str):
+        return self.schemaPrefix + tableName
 
     def generateData(
         self,
@@ -40,7 +47,7 @@ class RandomDataGenerator:
 
     def _ensureEmailsLoaded(self, cur):
         if len(self.usedEmails) == 0:
-            cur.execute("SELECT email FROM viewer")
+            cur.execute("SELECT email FROM " + self._getTableName("viewer"))
             rows = cur.fetchall()
             for r in rows:
                 val = r[0]
@@ -62,22 +69,22 @@ class RandomDataGenerator:
                 self._generateCinemas(cur, rowsCount)
                 return
             if tableName == 'hall':
-                cur.execute("SELECT cinema_id FROM cinema")
+                cur.execute("SELECT cinema_id FROM " + self._getTableName("cinema"))
                 cinemaRows = cur.fetchall()
                 if len(cinemaRows) == 0:
                     self._generateCinemas(cur, 1)
-                    cur.execute("SELECT cinema_id FROM cinema")
+                    cur.execute("SELECT cinema_id FROM " + self._getTableName("cinema"))
                     cinemaRows = cur.fetchall()
                 self._generateHalls(cur, rowsCount, [r[0] for r in cinemaRows])
                 return
             if tableName == 'viewer_profile':
-                cur.execute("SELECT viewer_id FROM viewer")
+                cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
                 viewerRows = cur.fetchall()
                 if len(viewerRows) == 0:
                     self._generateViewers(cur, rowsCount if rowsCount > 0 else 1)
-                    cur.execute("SELECT viewer_id FROM viewer")
+                    cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
                     viewerRows = cur.fetchall()
-                cur.execute("SELECT viewer_id FROM viewer_profile")
+                cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer_profile"))
                 existing = set([r[0] for r in cur.fetchall()])
                 toInsert = []
                 added = 0
@@ -94,24 +101,24 @@ class RandomDataGenerator:
                     added = added + 1
                 if len(toInsert) > 0:
                     cur.executemany(
-                        "INSERT INTO viewer_profile (viewer_id, male_gender, nickname, birth_date) VALUES (%s, %s, %s, %s)",
+                        "INSERT INTO " + self._getTableName("viewer_profile") + " (viewer_id, male_gender, nickname, birth_date) VALUES (%s, %s, %s, %s)",
                         toInsert
                     )
                 return
             if tableName == 'favorite_movies':
-                cur.execute("SELECT viewer_id FROM viewer")
+                cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
                 viewers = [r[0] for r in cur.fetchall()]
                 if len(viewers) == 0:
                     self._generateViewers(cur, rowsCount if rowsCount > 0 else 1)
-                    cur.execute("SELECT viewer_id FROM viewer")
+                    cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
                     viewers = [r[0] for r in cur.fetchall()]
-                cur.execute("SELECT movie_id FROM movie")
+                cur.execute("SELECT movie_id FROM " + self._getTableName("movie"))
                 movies = [r[0] for r in cur.fetchall()]
                 if len(movies) == 0:
                     self._generateMovies(cur, rowsCount if rowsCount > 0 else 1)
-                    cur.execute("SELECT movie_id FROM movie")
+                    cur.execute("SELECT movie_id FROM " + self._getTableName("movie"))
                     movies = [r[0] for r in cur.fetchall()]
-                cur.execute("SELECT viewer_id, movie_id FROM favorite_movies")
+                cur.execute("SELECT viewer_id, movie_id FROM " + self._getTableName("favorite_movies"))
                 existingPairs = set([(r[0], r[1]) for r in cur.fetchall()])
                 newRows = []
                 attempts = 0
@@ -125,20 +132,20 @@ class RandomDataGenerator:
                         newRows.append(pair)
                     attempts = attempts + 1
                 if len(newRows) > 0:
-                    cur.executemany("INSERT INTO favorite_movies (viewer_id, movie_id) VALUES (%s, %s)", newRows)
+                    cur.executemany("INSERT INTO " + self._getTableName("favorite_movies") + " (viewer_id, movie_id) VALUES (%s, %s)", newRows)
                 return
             if tableName == 'movie_review':
-                cur.execute("SELECT viewer_id FROM viewer")
+                cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
                 viewers = [r[0] for r in cur.fetchall()]
                 if len(viewers) == 0:
                     self._generateViewers(cur, rowsCount if rowsCount > 0 else 1)
-                    cur.execute("SELECT viewer_id FROM viewer")
+                    cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
                     viewers = [r[0] for r in cur.fetchall()]
-                cur.execute("SELECT movie_id FROM movie")
+                cur.execute("SELECT movie_id FROM " + self._getTableName("movie"))
                 movies = [r[0] for r in cur.fetchall()]
                 if len(movies) == 0:
                     self._generateMovies(cur, rowsCount if rowsCount > 0 else 1)
-                    cur.execute("SELECT movie_id FROM movie")
+                    cur.execute("SELECT movie_id FROM " + self._getTableName("movie"))
                     movies = [r[0] for r in cur.fetchall()]
                 newRows = []
                 countAdded = 0
@@ -151,22 +158,22 @@ class RandomDataGenerator:
                     countAdded = countAdded + 1
                 if len(newRows) > 0:
                     cur.executemany(
-                        "INSERT INTO movie_review (movie_id, viewer_id, rating, comment) VALUES (%s, %s, %s, %s)",
+                        "INSERT INTO " + self._getTableName("movie_review") + " (movie_id, viewer_id, rating, comment) VALUES (%s, %s, %s, %s)",
                         newRows
                     )
                 return
             if tableName == 'session':
-                cur.execute("SELECT hall_id, seat_count FROM hall")
+                cur.execute("SELECT hall_id, seat_count FROM " + self._getTableName("hall"))
                 hallRows = cur.fetchall()
                 if len(hallRows) == 0:
                     self._generateCinemasAndHalls(cur, 1, 1)
-                    cur.execute("SELECT hall_id, seat_count FROM hall")
+                    cur.execute("SELECT hall_id, seat_count FROM " + self._getTableName("hall"))
                     hallRows = cur.fetchall()
-                cur.execute("SELECT movie_id FROM movie")
+                cur.execute("SELECT movie_id FROM " + self._getTableName("movie"))
                 movieRows = cur.fetchall()
                 if len(movieRows) == 0:
                     self._generateMovies(cur, rowsCount if rowsCount > 0 else 1)
-                    cur.execute("SELECT movie_id FROM movie")
+                    cur.execute("SELECT movie_id FROM " + self._getTableName("movie"))
                     movieRows = cur.fetchall()
                 sessionsData = []
                 for indexSession in range(rowsCount):
@@ -181,26 +188,26 @@ class RandomDataGenerator:
                     sessionsData.append((movieId, hallId, dtVal, availableSeats, finalPriceVal))
                 if len(sessionsData) > 0:
                     cur.executemany(
-                        "INSERT INTO session (movie_id, hall_id, session_datetime, available_seats, final_price) VALUES (%s, %s, %s, %s, %s)",
+                        "INSERT INTO " + self._getTableName("session") + " (movie_id, hall_id, session_datetime, available_seats, final_price) VALUES (%s, %s, %s, %s, %s)",
                         sessionsData
                     )
                 return
             if tableName == 'ticket':
-                cur.execute("SELECT session_id, available_seats FROM session")
+                cur.execute("SELECT session_id, available_seats FROM " + self._getTableName("session"))
                 sessionRows = cur.fetchall()
                 if len(sessionRows) == 0:
                     self._generateCinemasAndHalls(cur, 1, 1)
                     self._generateMovies(cur, 1)
                     self._generateSessions(cur, 1)
-                    cur.execute("SELECT session_id, available_seats FROM session")
+                    cur.execute("SELECT session_id, available_seats FROM " + self._getTableName("session"))
                     sessionRows = cur.fetchall()
-                cur.execute("SELECT viewer_id FROM viewer")
+                cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
                 viewerRows = cur.fetchall()
                 if len(viewerRows) == 0:
                     self._generateViewers(cur, rowsCount if rowsCount > 0 else 1)
-                    cur.execute("SELECT viewer_id FROM viewer")
+                    cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
                     viewerRows = cur.fetchall()
-                cur.execute("SELECT session_id, viewer_id FROM ticket")
+                cur.execute("SELECT session_id, viewer_id FROM " + self._getTableName("ticket"))
                 existingTickets = set([(r[0], r[1]) for r in cur.fetchall()])
                 ticketsToInsert = []
                 attempts = 0
@@ -219,7 +226,7 @@ class RandomDataGenerator:
                     existingTickets.add(keyPair)
                     attempts = attempts + 1
                 if len(ticketsToInsert) > 0:
-                    cur.executemany("INSERT INTO ticket (session_id, viewer_id) VALUES (%s, %s)", ticketsToInsert)
+                    cur.executemany("INSERT INTO " + self._getTableName("ticket") + " (session_id, viewer_id) VALUES (%s, %s)", ticketsToInsert)
                 return
             raise ValueError('Unsupported table for direct generation: ' + tableName)
 
@@ -373,7 +380,7 @@ class RandomDataGenerator:
             viewersData.append((firstName, lastName, email, phone))
         if len(viewersData) > 0:
             cur.executemany(
-                "INSERT INTO viewer (first_name, last_name, email, phone_number) VALUES (%s, %s, %s, %s)",
+                "INSERT INTO " + self._getTableName("viewer") + " (first_name, last_name, email, phone_number) VALUES (%s, %s, %s, %s)",
                 viewersData
             )
 
@@ -397,10 +404,7 @@ class RandomDataGenerator:
             ))
         if len(moviesData) > 0:
             cur.executemany(
-                """
-                INSERT INTO movie (title, genre, duration_minutes, release_date, rating, age_restriction)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                """,
+                "INSERT INTO " + self._getTableName("movie") + " (title, genre, duration_minutes, release_date, rating, age_restriction) VALUES (%s, %s, %s, %s, %s, %s)",
                 moviesData
             )
 
@@ -415,7 +419,7 @@ class RandomDataGenerator:
             ))
         if len(cinemaData) > 0:
             cur.executemany(
-                "INSERT INTO cinema (name, address, phone_number, city) VALUES (%s, %s, %s, %s)",
+                "INSERT INTO " + self._getTableName("cinema") + " (name, address, phone_number, city) VALUES (%s, %s, %s, %s)",
                 cinemaData
             )
 
@@ -435,12 +439,12 @@ class RandomDataGenerator:
             ))
         if len(hallsData) > 0:
             cur.executemany(
-                "INSERT INTO hall (cinema_id, hall_name, seat_count, base_ticket_price) VALUES (%s, %s, %s, %s)",
+                "INSERT INTO " + self._getTableName("hall") + " (cinema_id, hall_name, seat_count, base_ticket_price) VALUES (%s, %s, %s, %s)",
                 hallsData
             )
 
     def _generateViewerProfiles(self, cur):
-        cur.execute("SELECT viewer_id FROM viewer")
+        cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
         viewerIds = cur.fetchall()
         profilesData = []
         for i in range(len(viewerIds)):
@@ -455,10 +459,7 @@ class RandomDataGenerator:
             profilesData.append((viewerId, male, nickname, birth))
         if len(profilesData) > 0:
             cur.executemany(
-                """
-                INSERT INTO viewer_profile (viewer_id, male_gender, nickname, birth_date)
-                VALUES (%s, %s, %s, %s)
-                """,
+                "INSERT INTO " + self._getTableName("viewer_profile") + " (viewer_id, male_gender, nickname, birth_date) VALUES (%s, %s, %s, %s)",
                 profilesData
             )
 
@@ -466,10 +467,7 @@ class RandomDataGenerator:
         hallIds = []
         for i in range(cinemasCount):
             cur.execute(
-                """
-                INSERT INTO cinema (name, address, phone_number, city)
-                VALUES (%s, %s, %s, %s) RETURNING cinema_id
-                """,
+                "INSERT INTO " + self._getTableName("cinema") + " (name, address, phone_number, city) VALUES (%s, %s, %s, %s) RETURNING cinema_id",
                 (
                     self._randomString(),
                     self._randomString(),
@@ -482,10 +480,7 @@ class RandomDataGenerator:
                 basePriceCents = random.randint(500, 2000)
                 basePrice = Decimal(basePriceCents) / Decimal(100)
                 cur.execute(
-                    """
-                    INSERT INTO hall (cinema_id, hall_name, seat_count, base_ticket_price)
-                    VALUES (%s, %s, %s, %s) RETURNING hall_id
-                    """,
+                    "INSERT INTO " + self._getTableName("hall") + " (cinema_id, hall_name, seat_count, base_ticket_price) VALUES (%s, %s, %s, %s) RETURNING hall_id",
                     (
                         cinemaId,
                         self._randomString(),
@@ -497,12 +492,12 @@ class RandomDataGenerator:
         self.generatedHallIds = hallIds
 
     def _generateSessions(self, cur, sessionsPerHall):
-        cur.execute("SELECT movie_id FROM movie")
+        cur.execute("SELECT movie_id FROM " + self._getTableName("movie"))
         movieIds = cur.fetchall()
         sessionsData = []
         for i in range(len(getattr(self, 'generatedHallIds', []))):
             hallId = self.generatedHallIds[i]
-            cur.execute("SELECT seat_count FROM hall WHERE hall_id = %s", (hallId,))
+            cur.execute("SELECT seat_count FROM " + self._getTableName("hall") + " WHERE hall_id = %s", (hallId,))
             seatRow = cur.fetchone()
             if seatRow is None:
                 continue
@@ -525,17 +520,14 @@ class RandomDataGenerator:
                 ))
         if len(sessionsData) > 0:
             cur.executemany(
-                """
-                INSERT INTO session (movie_id, hall_id, session_datetime, available_seats, final_price)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
+                "INSERT INTO " + self._getTableName("session") + " (movie_id, hall_id, session_datetime, available_seats, final_price) VALUES (%s, %s, %s, %s, %s)",
                 sessionsData
             )
 
     def _generateFavoriteMovies(self, cur, rate):
-        cur.execute("SELECT viewer_id FROM viewer")
+        cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
         viewerIds = cur.fetchall()
-        cur.execute("SELECT movie_id FROM movie")
+        cur.execute("SELECT movie_id FROM " + self._getTableName("movie"))
         movieIds = cur.fetchall()
         favoritesData = []
         for i in range(len(viewerIds)):
@@ -547,14 +539,14 @@ class RandomDataGenerator:
                     favoritesData.append((vid, mid))
         if len(favoritesData) > 0:
             cur.executemany(
-                "INSERT INTO favorite_movies (viewer_id, movie_id) VALUES (%s, %s)",
+                "INSERT INTO " + self._getTableName("favorite_movies") + " (viewer_id, movie_id) VALUES (%s, %s)",
                 favoritesData
             )
 
     def _generateMovieReviews(self, cur, rate):
-        cur.execute("SELECT viewer_id FROM viewer")
+        cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
         viewerIds = cur.fetchall()
-        cur.execute("SELECT movie_id FROM movie")
+        cur.execute("SELECT movie_id FROM " + self._getTableName("movie"))
         movieIds = cur.fetchall()
         reviewsData = []
         for i in range(len(viewerIds)):
@@ -571,17 +563,14 @@ class RandomDataGenerator:
                     ))
         if len(reviewsData) > 0:
             cur.executemany(
-                """
-                INSERT INTO movie_review (movie_id, viewer_id, rating, comment)
-                VALUES (%s, %s, %s, %s)
-                """,
+                "INSERT INTO " + self._getTableName("movie_review") + " (movie_id, viewer_id, rating, comment) VALUES (%s, %s, %s, %s)",
                 reviewsData
             )
 
     def _generateTickets(self, cur, rate):
-        cur.execute("SELECT viewer_id FROM viewer")
+        cur.execute("SELECT viewer_id FROM " + self._getTableName("viewer"))
         viewerIds = cur.fetchall()
-        cur.execute("SELECT session_id, available_seats FROM session")
+        cur.execute("SELECT session_id, available_seats FROM " + self._getTableName("session"))
         sessionRows = cur.fetchall()
         pairs = []
         for i in range(len(sessionRows)):
@@ -607,6 +596,6 @@ class RandomDataGenerator:
                             attempts = attempts + 1
         if len(pairs) > 0:
             cur.executemany(
-                "INSERT INTO ticket (session_id, viewer_id) VALUES (%s, %s)",
+                "INSERT INTO " + self._getTableName("ticket") + " (session_id, viewer_id) VALUES (%s, %s)",
                 pairs
             )

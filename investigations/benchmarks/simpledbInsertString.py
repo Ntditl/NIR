@@ -7,7 +7,8 @@ from lib.visualization.plots import PlotBuilder
 ROW_COUNTS = [100, 500, 1000]
 REPEATS = 3
 RANDOM_SEED = 13579
-DATA_DIR = 'simpledb_bench_insert_str'
+BASE_TEMP_DIR = os.path.join(os.path.dirname(__file__), 'foldersForSimpleDb')
+DATA_DIR = os.path.join(BASE_TEMP_DIR, 'simpledb_bench_insert_str')
 CSV_FILE = 'simpledb_insert_string.csv'
 PLOT_FILE = 'simpledb_insert_string'
 
@@ -68,5 +69,6 @@ def runSimpleDbInsertString(outputDir, raster=True):
     return {'with_index': withIdx, 'no_index': noIdx, 'csv': csvPath}
 
 if __name__ == '__main__':
-    runSimpleDbInsertString(os.path.join('investigations','benchmarkResults'), True)
-
+    rootProjectDir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    outputDir = os.path.join(rootProjectDir, 'benchmarkResults')
+    runSimpleDbInsertString(outputDir, True)

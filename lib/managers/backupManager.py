@@ -38,6 +38,16 @@ class BackupManager:
         self.lastBackupDir = targetDir
         return targetDir
 
+    def _ticketTriggerExists(self, cursor):
+        cursor.execute("""
+            SELECT 1 FROM pg_trigger t
+            JOIN pg_class c ON t.tgrelid = c.oid
+            JOIN pg_namespace n ON c.relnamespace = n.oid
+            WHERE n.nspname='public' AND c.relname='ticket' AND t.tgname='trg_ticket_reserve'
+        """)
+        row = cursor.fetchone()
+        return row is not None
+
     def restoreAllTables(self, backupName: str = None) -> None:
         if backupName is None:
             if self.lastBackupDir is not None:
@@ -54,16 +64,17 @@ class BackupManager:
         with getDbConnection() as (databaseConnection, dbCursor):
             for i in range(len(self.tableNames) - 1, -1, -1):
                 dbCursor.execute('TRUNCATE TABLE ' + self.tableNames[i] + ' RESTART IDENTITY CASCADE;')
+            ticketTriggerPresent = self._ticketTriggerExists(dbCursor)
             for i in range(len(self.tableNames)):
                 tableName = self.tableNames[i]
                 filePath = os.path.join(targetDir, tableName + '.csv')
                 if os.path.exists(filePath):
-                    if tableName == 'ticket':
+                    if tableName == 'ticket' and ticketTriggerPresent:
                         dbCursor.execute('ALTER TABLE ticket DISABLE TRIGGER trg_ticket_reserve;')
                     with open(filePath, mode='r', encoding='utf-8', newline='') as inFile:
                         sql = 'COPY ' + tableName + ' FROM STDIN WITH (FORMAT CSV, HEADER TRUE)'
                         dbCursor.copy_expert(sql, inFile)
-                    if tableName == 'ticket':
+                    if tableName == 'ticket' and ticketTriggerPresent:
                         dbCursor.execute('ALTER TABLE ticket ENABLE TRIGGER trg_ticket_reserve;')
             for i in range(len(self.tableNames)):
                 tableName = self.tableNames[i]
@@ -82,8 +93,15 @@ class BackupManager:
                     if seqRow is not None and seqRow[0] is not None:
                         dbCursor.execute('SELECT COALESCE(MAX(' + col + '), 0) FROM ' + tableName)
                         maxId = dbCursor.fetchone()[0]
-                        dbCursor.execute(
-                            'SELECT setval(%s, %s, %s)',
-                            (seqRow[0], maxId if maxId is not None else 0, True if maxId is not None and maxId > 0 else False)
-                        )
+                        if maxId is None or maxId < 1:
+                            # пустая таблица после восстановления: ставим 1 и is_called = false
+                            dbCursor.execute(
+                                'SELECT setval(%s, %s, %s)',
+                                (seqRow[0], 1, False)
+                            )
+                        else:
+                            dbCursor.execute(
+                                'SELECT setval(%s, %s, %s)',
+                                (seqRow[0], maxId, True)
+                            )
         self.lastBackupDir = targetDir

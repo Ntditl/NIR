@@ -7,14 +7,20 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lib.db.connection import getDbConnection
 from lib.db.models import getCreateTablesSql
-from benchmarks.generationSpeed import measureGenerationSpeed
-from benchmarks.newResearch import runAllResearch
-from benchmarks.simpledbSelectNumber import runSimpleDbSelectNumber
-from benchmarks.simpledbSelectString import runSimpleDbSelectString
-from benchmarks.simpledbInsertNumber import runSimpleDbInsertNumber
-from benchmarks.simpledbInsertString import runSimpleDbInsertString
-from benchmarks.simpledbDeleteNumber import runSimpleDbDeleteNumber
-from benchmarks.simpledbDeleteString import runSimpleDbDeleteString
+from investigations.benchmarks.generationSpeed import measureGenerationSpeed
+from investigations.sandboxUtils import setupSandboxForResearch, cleanupSandboxAfterResearch, resetSandboxDatabase
+from investigations.databaseOperations.tableOperations.basicOperations import selectPrimaryKey, selectStringField, selectNumberField, measureDeleteWhere
+from investigations.databaseOperations.joinOperations.joinPerformance import measureJoinOperations, measureComplexJoinOperations, measureManyToManyJoin
+from investigations.indexPerformance.primaryKeyIndexes.pkPerformance import measurePkIndexEffect, measurePkInequalityEffect, measurePkInsertEffect
+from investigations.indexPerformance.stringIndexes.stringIndexPerformance import measureStringIndexExperiment, measureStringLikePrefix, measureStringLikeContains, measureStringInsertExperiment
+from investigations.indexPerformance.fullTextIndexes.ftsPerformance import measureFtsSingleWordExperiment, measureFtsMultiWordExperiment, measureFtsInsertExperiment
+from investigations.researchUtils import ROW_COUNTS_DEFAULT, PK_ROW_COUNTS, STRING_INDEX_ROW_COUNTS, FTS_ROW_COUNTS
+from investigations.benchmarks.simpledbDeleteNumber import runSimpleDbDeleteNumber
+from investigations.benchmarks.simpledbDeleteString import runSimpleDbDeleteString
+from investigations.benchmarks.simpledbInsertNumber import runSimpleDbInsertNumber
+from investigations.benchmarks.simpledbInsertString import runSimpleDbInsertString
+from investigations.benchmarks.simpledbSelectNumber import runSimpleDbSelectNumber
+from investigations.benchmarks.simpledbSelectString import runSimpleDbSelectString
 
 
 def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, disableFts: bool, disableSimpleDb: bool) -> None:
@@ -60,13 +66,47 @@ def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, di
     )
 
     print("Запускаю исследования: DELETE, JOIN, PK, строковый индекс, FTS →", resultsDir)
-    runAllResearch(
-        outputDir=resultsDir,
-        raster=True,
-        includePkExperiment=(not disablePk),
-        includeStringIndexExperiment=(not disableStringIndex),
-        includeFtsExperiment=(not disableFts)
-    )
+
+    resetSandboxDatabase()
+    setupSandboxForResearch()
+
+    try:
+        print('=== ИССЛЕДОВАНИЯ ОПЕРАЦИЙ С ТАБЛИЦАМИ (ПУНКТ 5) ===', flush=True)
+
+        print('Исследование SELECT операций', flush=True)
+        selectPkResults = selectPrimaryKey(ROW_COUNTS_DEFAULT)
+        selectStringResults = selectStringField(ROW_COUNTS_DEFAULT)
+        selectNumberResults = selectNumberField(ROW_COUNTS_DEFAULT)
+
+        print('Исследование DELETE операций', flush=True)
+        deleteResults = measureDeleteWhere(ROW_COUNTS_DEFAULT)
+
+        print('=== ИССЛЕДОВАНИЯ JOIN ОПЕРАЦИЙ ===', flush=True)
+        joinResults = measureJoinOperations(ROW_COUNTS_DEFAULT)
+        complexJoinResults = measureComplexJoinOperations(ROW_COUNTS_DEFAULT)
+        manyToManyResults = measureManyToManyJoin(ROW_COUNTS_DEFAULT)
+
+        if not disablePk:
+            print('=== ИССЛЕДОВАНИЯ ПЕРВИЧНЫХ КЛЮЧЕЙ (ПУНКТ 6.a) ===', flush=True)
+            pkResults = measurePkIndexEffect(PK_ROW_COUNTS, resultsDir, True)
+            pkIneqResults = measurePkInequalityEffect(PK_ROW_COUNTS, resultsDir, True)
+            pkInsertResults = measurePkInsertEffect(PK_ROW_COUNTS, resultsDir, True)
+
+        if not disableStringIndex:
+            print('=== ИССЛЕДОВАНИЯ СТРОКОВЫХ ИНДЕКСОВ (ПУНКТ 6.b) ===', flush=True)
+            stringIdxResults = measureStringIndexExperiment(STRING_INDEX_ROW_COUNTS, resultsDir, True)
+            stringPrefixResults = measureStringLikePrefix(STRING_INDEX_ROW_COUNTS, resultsDir, True)
+            stringContainsResults = measureStringLikeContains(STRING_INDEX_ROW_COUNTS, resultsDir, True)
+            stringInsertResults = measureStringInsertExperiment(STRING_INDEX_ROW_COUNTS, resultsDir, True)
+
+        if not disableFts:
+            print('=== ИССЛЕДОВАНИЯ ПОЛНОТЕКСТОВЫХ ИНДЕКСОВ (ПУНКТ 6.c) ===', flush=True)
+            ftsSingleResults = measureFtsSingleWordExperiment(FTS_ROW_COUNTS, resultsDir, True)
+            ftsMultiResults = measureFtsMultiWordExperiment(FTS_ROW_COUNTS, resultsDir, True)
+            ftsInsertResults = measureFtsInsertExperiment(FTS_ROW_COUNTS, resultsDir, True)
+
+    finally:
+        cleanupSandboxAfterResearch()
 
     if not disableSimpleDb:
         print("SimpleDB: SELECT WHERE по числовому полю (с индексом и без) →", resultsDir)

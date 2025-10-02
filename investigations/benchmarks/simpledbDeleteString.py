@@ -7,7 +7,8 @@ from lib.visualization.plots import PlotBuilder
 ROW_COUNTS = [100, 500, 1000]
 REPEATS = 3
 RANDOM_SEED = 97531
-DATA_DIR = 'simpledb_bench_delete_str'
+BASE_TEMP_DIR = os.path.join(os.path.dirname(__file__), 'foldersForSimpleDb')
+DATA_DIR = os.path.join(BASE_TEMP_DIR, 'simpledb_bench_delete_str')
 CSV_FILE = 'simpledb_delete_string.csv'
 PLOT_FILE = 'simpledb_delete_string'
 
@@ -74,5 +75,6 @@ def runSimpleDbDeleteString(outputDir, raster=True):
     return {'with_index': withIdx, 'no_index': noIdx, 'csv': csvPath}
 
 if __name__ == '__main__':
-    runSimpleDbDeleteString(os.path.join('investigations','benchmarkResults'), True)
-
+    rootProjectDir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    outputDir = os.path.join(rootProjectDir, 'benchmarkResults')
+    runSimpleDbDeleteString(outputDir, True)

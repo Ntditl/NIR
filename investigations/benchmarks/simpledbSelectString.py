@@ -11,7 +11,8 @@ ROW_COUNTS = [100, 300, 600, 850, 1000]
 REPEATS = 3
 QUERIES_PER_RUN = 100
 RANDOM_SEED = 43210
-DATA_DIR = 'simpledb_bench_data_str'
+BASE_TEMP_DIR = os.path.join(os.path.dirname(__file__), 'foldersForSimpleDb')
+DATA_DIR = os.path.join(BASE_TEMP_DIR, 'simpledb_bench_data_str')
 CSV_FILE = 'simpledb_select_string.csv'
 PLOT_FILE = 'simpledb_select_string'
 
@@ -104,4 +105,6 @@ def runSimpleDbSelectString(outputDir, raster=True):
     }
 
 if __name__ == '__main__':
-    runSimpleDbSelectString(os.path.join('investigations', 'benchmarkResults'), True)
+    rootProjectDir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    outputDir = os.path.join(rootProjectDir, 'benchmarkResults')
+    runSimpleDbSelectString(outputDir, True)

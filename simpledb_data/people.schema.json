@@ -1,1 +1,0 @@
-{"table": "people", "columns": [{"name": "id", "type": "INT", "index": true}, {"name": "name", "type": "VARCHAR", "max": 64}, {"name": "age", "type": "INT"}]}

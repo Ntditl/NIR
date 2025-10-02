@@ -110,4 +110,6 @@ def runSimpleDbSelectNumber(outputDir, raster=True):
     }
 
 if __name__ == '__main__':
-    runSimpleDbSelectNumber(os.path.join('investigations', 'benchmarkResults'), True)
+    rootInvestigationsDir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    outputDir = os.path.join(rootInvestigationsDir, 'benchmarkResults')
+    runSimpleDbSelectNumber(outputDir, True)

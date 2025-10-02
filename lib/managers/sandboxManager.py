@@ -6,7 +6,8 @@ class SandboxManager:
 
     def createSandboxSchema(self):
         with getDbConnection() as (conn, cur):
-            cur.execute("CREATE SCHEMA IF NOT EXISTS " + self.sandboxSchemaName + ";")
+            cur.execute("DROP SCHEMA IF EXISTS " + self.sandboxSchemaName + " CASCADE;")
+            cur.execute("CREATE SCHEMA " + self.sandboxSchemaName + ";")
             tableNames = self._getPublicTables(cur)
             seqPlans = {}
             createPlans = {}
@@ -61,7 +62,10 @@ class SandboxManager:
                     seqName = self.sandboxSchemaName + "." + tbl + "_" + col + "_seq"
                     cur.execute("SELECT COALESCE(MAX(" + col + "),0) FROM " + self.sandboxSchemaName + "." + tbl)
                     maxVal = cur.fetchone()[0]
-                    cur.execute("SELECT setval('" + seqName + "', " + str(maxVal) + ", true)")
+                    if maxVal is None or maxVal < 1:
+                        cur.execute("SELECT setval('" + seqName + "', 1, false)")
+                    else:
+                        cur.execute("SELECT setval('" + seqName + "', " + str(maxVal) + ", true)")
             fkData = self._getForeignKeys(cur)
             for i in range(len(fkData)):
                 childTable, conName, conDef = fkData[i]

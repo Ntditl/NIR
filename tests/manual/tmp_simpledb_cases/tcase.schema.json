@@ -1,0 +1,1 @@
+{"table": "tcase", "columns": [{"name": "id", "type": "INT", "index": true}, {"name": "name", "type": "VARCHAR", "max": 16}, {"name": "note", "type": "VARCHAR", "max": 32}]}

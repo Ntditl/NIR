@@ -6,7 +6,7 @@ from lib.db.models import createAllTables, dropAllTables, recreateAllTables, get
 from lib.managers.sandboxManager import SandboxManager
 from lib.data.generators import RandomDataGenerator
 from lib.db.connection import getDbConnection
-from lib.dataManager import DataManager
+from lib.managers.dataManager import DataManager
 from lib.managers.backupManager import BackupManager
 
 

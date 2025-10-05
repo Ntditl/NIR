@@ -49,27 +49,30 @@ class SimpleDatabase:
             return False
         foundIndex = -1
         for columnIndex in range(len(eng.schema.columns)):
-            c = eng.schema.columns[columnIndex]
-            if c['name'] == colName and c['type'] == 'INT':
-                c['index'] = True
+            colDef = eng.schema.columns[columnIndex]
+            if colDef['name'] == colName and colDef['type'] == 'INT':
+                colDef['index'] = True
                 foundIndex = columnIndex
                 break
         if foundIndex < 0:
             return False
         with open(eng.files.schemaPath(), 'w', encoding='utf-8') as f:
             json.dump(eng.schema.toDict(), f, ensure_ascii=False)
-        idx = IntIndex(eng.files.indexPath(colName))
-        total = eng.rowCount()
-        for rid in range(total):
-            if eng._isRowActive(rid):
-                data = eng._readRowData(rid)
-                off = int.from_bytes(data[2 + foundIndex*4: 2 + foundIndex*4 + 4], 'little')
-                valBytes = data[off:off+8]
-                if len(valBytes) == 8:
-                    v = int.from_bytes(valBytes, 'little')
-                    idx.add(v, rid)
-        idx.save()
-        eng.indexes[colName] = idx
+        indexObj = IntIndex(eng.files.indexPath(colName))
+        totalRows = eng.rowCount()
+        for rowId in range(totalRows):
+            if eng._isRowActive(rowId):
+                rowBytes = eng._readRowBytes(rowId)
+                if rowBytes is None:
+                    continue
+                value = eng._readColumnValueRaw(rowBytes, foundIndex)
+                if value is not None:
+                    try:
+                        indexObj.add(int(value), rowId)
+                    except Exception:
+                        pass
+        indexObj.save()
+        eng.indexes[colName] = indexObj
         return True
 
     def dropDataDir(self):

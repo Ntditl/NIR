@@ -16,6 +16,10 @@ TEST_MODULES.append('tests.manual.test_db_models_manual')
 TEST_MODULES.append('tests.manual.test_data_manager_manual')
 TEST_MODULES.append('tests.manual.test_generator_manual')
 TEST_MODULES.append('tests.manual.test_sandbox_backup_manual')
+TEST_MODULES.append('tests.manual.test_plots_manual')
+TEST_MODULES.append('tests.manual.test_simpledb_sql_manual')
+TEST_MODULES.append('tests.manual.test_sql_parser_manual')
+TEST_MODULES.append('tests.manual.test_main_manual')
 
 
 def run_all():
@@ -48,4 +52,3 @@ def run_all():
 
 if __name__ == '__main__':
     run_all()
-

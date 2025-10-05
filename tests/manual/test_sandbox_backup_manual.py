@@ -1,7 +1,13 @@
 import os
 import shutil
+import importlib
 from lib.db.models import recreateAllTables
+
+# Принудительно перезагружаем модуль генератора для получения обновленной версии
+import lib.data.generators
+importlib.reload(lib.data.generators)
 from lib.data.generators import RandomDataGenerator
+
 from lib.managers.sandboxManager import SandboxManager
 from lib.managers.backupManager import BackupManager
 from lib.db.connection import getDbConnection
@@ -49,4 +55,3 @@ def run():
 
 if __name__ == '__main__':
     run()
-

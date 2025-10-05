@@ -9,18 +9,10 @@ from lib.db.connection import getDbConnection
 from lib.db.models import getCreateTablesSql
 from investigations.benchmarks.generationSpeed import measureGenerationSpeed
 from investigations.sandboxUtils import setupSandboxForResearch, cleanupSandboxAfterResearch, resetSandboxDatabase
-from investigations.databaseOperations.tableOperations.basicOperations import selectPrimaryKey, selectStringField, selectNumberField, measureDeleteWhere
-from investigations.databaseOperations.joinOperations.joinPerformance import measureJoinOperations, measureComplexJoinOperations, measureManyToManyJoin
-from investigations.indexPerformance.primaryKeyIndexes.pkPerformance import measurePkIndexEffect, measurePkInequalityEffect, measurePkInsertEffect
-from investigations.indexPerformance.stringIndexes.stringIndexPerformance import measureStringIndexExperiment, measureStringLikePrefix, measureStringLikeContains, measureStringInsertExperiment
-from investigations.indexPerformance.fullTextIndexes.ftsPerformance import measureFtsSingleWordExperiment, measureFtsMultiWordExperiment, measureFtsInsertExperiment
+from investigations.databaseOperationsResearch import selectNumberField, selectDateField, insertMovieData, measureDeleteWhere, measureJoinOperations, measureComplexJoinOperations, measureManyToManyJoin
+from investigations.indexPerformanceResearch import measurePkIndexEffect, measurePkInequalityEffect, measurePkInsertEffect, measureStringIndexExperiment, measureStringLikePrefix, measureStringLikeContains, measureStringInsertExperiment, measureFtsSingleWordExperiment, measureFtsMultiWordExperiment, measureFtsInsertExperiment
 from investigations.researchUtils import ROW_COUNTS_DEFAULT, PK_ROW_COUNTS, STRING_INDEX_ROW_COUNTS, FTS_ROW_COUNTS
-from investigations.benchmarks.simpledbDeleteNumber import runSimpleDbDeleteNumber
-from investigations.benchmarks.simpledbDeleteString import runSimpleDbDeleteString
-from investigations.benchmarks.simpledbInsertNumber import runSimpleDbInsertNumber
-from investigations.benchmarks.simpledbInsertString import runSimpleDbInsertString
-from investigations.benchmarks.simpledbSelectNumber import runSimpleDbSelectNumber
-from investigations.benchmarks.simpledbSelectString import runSimpleDbSelectString
+from investigations.benchmarks.simpledbBenchmarks import runSimpleDbDeleteNumber, runSimpleDbDeleteString, runSimpleDbInsertNumber, runSimpleDbInsertString, runSimpleDbSelectNumber, runSimpleDbSelectString
 
 
 def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, disableFts: bool, disableSimpleDb: bool) -> None:
@@ -74,9 +66,11 @@ def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, di
         print('=== ИССЛЕДОВАНИЯ ОПЕРАЦИЙ С ТАБЛИЦАМИ (ПУНКТ 5) ===', flush=True)
 
         print('Исследование SELECT операций', flush=True)
-        selectPkResults = selectPrimaryKey(ROW_COUNTS_DEFAULT)
-        selectStringResults = selectStringField(ROW_COUNTS_DEFAULT)
         selectNumberResults = selectNumberField(ROW_COUNTS_DEFAULT)
+        selectDateResults = selectDateField(ROW_COUNTS_DEFAULT)
+
+        print('Исследование INSERT операций', flush=True)
+        insertResults = insertMovieData(ROW_COUNTS_DEFAULT)
 
         print('Исследование DELETE операций', flush=True)
         deleteResults = measureDeleteWhere(ROW_COUNTS_DEFAULT)

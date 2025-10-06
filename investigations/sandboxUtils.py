@@ -17,15 +17,15 @@ def cleanupSandboxAfterResearch():
 
 def ensureBaseDataMinimalInSandbox():
     with getDbConnection() as (conn, cur):
-        cur.execute("SELECT COUNT(*) FROM " + SANDBOX_SCHEMA_NAME + ".cinema")
-        cinemaCount = cur.fetchone()[0]
-        if cinemaCount < 1:
+        cur.execute("SELECT COUNT(*) FROM " + SANDBOX_SCHEMA_NAME + ".viewer")
+        viewerCount = cur.fetchone()[0]
+        if viewerCount < 1:
             dataGenerator = RandomDataGenerator()
             dataGenerator.setSchemaPrefix(SANDBOX_SCHEMA_NAME + ".")
-            dataGenerator.generateCinemas(5)
-            dataGenerator.generateMovies(10)
             dataGenerator.generateViewers(10)
-            dataGenerator.generateSessions(15)
+            dataGenerator.generateMovies(10)
+            dataGenerator.generateViewerProfiles(5)
+            dataGenerator.generateFavoriteMovies(15)
 
 def resetSandboxDatabase():
     print('Сброс песочницы старт', flush=True)

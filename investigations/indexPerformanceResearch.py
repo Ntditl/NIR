@@ -25,7 +25,17 @@ def _executeIndexExperiment(tableName, columnName, indexSql, testFunction, rowCo
 
             dataGenerator = RandomDataGenerator()
             dataGenerator.setSchemaPrefix(SANDBOX_SCHEMA_NAME + ".")
-            getattr(dataGenerator, f'generate{tableName.capitalize()}s')(rowCount)
+            if tableName == 'viewer':
+                dataGenerator.generateViewers(rowCount)
+            elif tableName == 'movie':
+                dataGenerator.generateMovies(rowCount)
+            elif tableName == 'viewer_profile':
+                dataGenerator.generateViewers(rowCount)
+                dataGenerator.generateViewerProfiles(rowCount)
+            elif tableName == 'favorite_movies':
+                dataGenerator.generateViewers(rowCount)
+                dataGenerator.generateMovies(rowCount)
+                dataGenerator.generateFavoriteMovies(rowCount)
 
             if indexSql:
                 cur.execute(indexSql)
@@ -39,7 +49,8 @@ def _executeIndexExperiment(tableName, columnName, indexSql, testFunction, rowCo
             avgTimeWithIndex = totalTimeWithIndex / (RUNS * QUERIES_PER_RUN)
 
             if indexSql:
-                cur.execute(f"DROP INDEX IF EXISTS {SANDBOX_SCHEMA_NAME}.{columnName}_idx;")
+                indexNameMatch = columnName + '_idx'
+                cur.execute(f"DROP INDEX IF EXISTS {SANDBOX_SCHEMA_NAME}.{indexNameMatch};")
 
             totalTimeWithoutIndex = 0.0
             for runIndex in range(RUNS):
@@ -132,15 +143,25 @@ def measurePkInsertEffect(rowCounts, outputDir, rasterFormat):
         for runIndex in range(RUNS):
             with getDbConnection() as (conn, cur):
                 cur.execute(f"DROP TABLE IF EXISTS {SANDBOX_SCHEMA_NAME}.movie_no_pk;")
-                cur.execute(f"CREATE TABLE {SANDBOX_SCHEMA_NAME}.movie_no_pk AS SELECT * FROM {SANDBOX_SCHEMA_NAME}.movie WHERE 1=0;")
+                cur.execute(f"""
+                    CREATE TABLE {SANDBOX_SCHEMA_NAME}.movie_no_pk (
+                        movie_id INT,
+                        title VARCHAR(255),
+                        genre VARCHAR(100),
+                        duration_minutes INT,
+                        release_date DATE
+                    );
+                """)
 
                 def insertWithoutPk():
                     dataGenerator = RandomDataGenerator()
                     dataGenerator.setSchemaPrefix(SANDBOX_SCHEMA_NAME + ".")
                     for i in range(insertCount):
-                        movieData = dataGenerator._generateMovieData()
-                        cur.execute(f"INSERT INTO {SANDBOX_SCHEMA_NAME}.movie_no_pk (title, description, release_date, duration_minutes, rating) VALUES (%s, %s, %s, %s, %s)",
-                                   (movieData['title'], movieData['description'], movieData['release_date'], movieData['duration_minutes'], movieData['rating']))
+                        cur.execute(f"""
+                            INSERT INTO {SANDBOX_SCHEMA_NAME}.movie_no_pk 
+                            (movie_id, title, genre, duration_minutes, release_date) 
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (i + 1, f"Movie {i}", "Action", random.randint(90, 180), "2023-01-01"))
 
                 timeWithoutPk = measureAverageTime(insertWithoutPk, 1)
                 totalTimeWithoutPk += timeWithoutPk
@@ -160,11 +181,11 @@ def measureStringIndexExperiment(rowCounts, outputDir, rasterFormat):
     def stringEqualityTest(cur, rowCount):
         names = ["Alice", "Bob", "Charlie", "Diana", "Edward", "Fiona"]
         targetName = random.choice(names)
-        cur.execute(f"SELECT viewer_id, name FROM {SANDBOX_SCHEMA_NAME}.viewer WHERE name = %s", (targetName,))
+        cur.execute(f"SELECT viewer_id, first_name FROM {SANDBOX_SCHEMA_NAME}.viewer WHERE first_name = %s", (targetName,))
         cur.fetchall()
 
-    indexSql = f"CREATE INDEX IF NOT EXISTS viewer_name_idx ON {SANDBOX_SCHEMA_NAME}.viewer (name);"
-    results1, results2 = _executeIndexExperiment('viewer', 'name', indexSql, stringEqualityTest, rowCounts, 'string_index_effect.csv', 'STRING INDEX')
+    indexSql = f"CREATE INDEX IF NOT EXISTS first_name_idx ON {SANDBOX_SCHEMA_NAME}.viewer (first_name);"
+    results1, results2 = _executeIndexExperiment('viewer', 'first_name', indexSql, stringEqualityTest, rowCounts, 'string_index_effect.csv', 'STRING INDEX')
 
     csvPath = outputDir + '/string_index_effect.csv'
     plotPath = outputDir + '/string_index_effect' if rasterFormat else None
@@ -176,11 +197,11 @@ def measureStringLikePrefix(rowCounts, outputDir, rasterFormat):
     def stringPrefixTest(cur, rowCount):
         prefixes = ["Al", "Bo", "Ch", "Di", "Ed", "Fi"]
         targetPrefix = random.choice(prefixes)
-        cur.execute(f"SELECT viewer_id, name FROM {SANDBOX_SCHEMA_NAME}.viewer WHERE name LIKE %s", (targetPrefix + '%',))
+        cur.execute(f"SELECT viewer_id, first_name FROM {SANDBOX_SCHEMA_NAME}.viewer WHERE first_name LIKE %s", (targetPrefix + '%',))
         cur.fetchall()
 
-    indexSql = f"CREATE INDEX IF NOT EXISTS viewer_name_idx ON {SANDBOX_SCHEMA_NAME}.viewer (name);"
-    results1, results2 = _executeIndexExperiment('viewer', 'name', indexSql, stringPrefixTest, rowCounts, 'string_like_prefix_effect.csv', 'STRING LIKE PREFIX')
+    indexSql = f"CREATE INDEX IF NOT EXISTS first_name_idx ON {SANDBOX_SCHEMA_NAME}.viewer (first_name);"
+    results1, results2 = _executeIndexExperiment('viewer', 'first_name', indexSql, stringPrefixTest, rowCounts, 'string_like_prefix_effect.csv', 'STRING LIKE PREFIX')
 
     csvPath = outputDir + '/string_like_prefix_effect.csv'
     plotPath = outputDir + '/string_like_prefix_effect' if rasterFormat else None
@@ -192,11 +213,11 @@ def measureStringLikeContains(rowCounts, outputDir, rasterFormat):
     def stringContainsTest(cur, rowCount):
         substrings = ["ic", "ob", "ar", "an", "wa", "on"]
         targetSubstring = random.choice(substrings)
-        cur.execute(f"SELECT viewer_id, name FROM {SANDBOX_SCHEMA_NAME}.viewer WHERE name LIKE %s", ('%' + targetSubstring + '%',))
+        cur.execute(f"SELECT viewer_id, first_name FROM {SANDBOX_SCHEMA_NAME}.viewer WHERE first_name LIKE %s", ('%' + targetSubstring + '%',))
         cur.fetchall()
 
-    indexSql = f"CREATE INDEX IF NOT EXISTS viewer_name_idx ON {SANDBOX_SCHEMA_NAME}.viewer (name);"
-    results1, results2 = _executeIndexExperiment('viewer', 'name', indexSql, stringContainsTest, rowCounts, 'string_like_contains_effect.csv', 'STRING LIKE CONTAINS')
+    indexSql = f"CREATE INDEX IF NOT EXISTS first_name_idx ON {SANDBOX_SCHEMA_NAME}.viewer (first_name);"
+    results1, results2 = _executeIndexExperiment('viewer', 'first_name', indexSql, stringContainsTest, rowCounts, 'string_like_contains_effect.csv', 'STRING LIKE CONTAINS')
 
     csvPath = outputDir + '/string_like_contains_effect.csv'
     plotPath = outputDir + '/string_like_contains_effect' if rasterFormat else None
@@ -217,7 +238,7 @@ def measureStringInsertExperiment(rowCounts, outputDir, rasterFormat):
         for runIndex in range(RUNS):
             with getDbConnection() as (conn, cur):
                 cur.execute(f"TRUNCATE TABLE {SANDBOX_SCHEMA_NAME}.viewer RESTART IDENTITY CASCADE;")
-                cur.execute(f"CREATE INDEX IF NOT EXISTS viewer_name_idx ON {SANDBOX_SCHEMA_NAME}.viewer (name);")
+                cur.execute(f"CREATE INDEX IF NOT EXISTS first_name_idx ON {SANDBOX_SCHEMA_NAME}.viewer (first_name);")
 
                 def insertWithIndex():
                     dataGenerator = RandomDataGenerator()
@@ -233,7 +254,7 @@ def measureStringInsertExperiment(rowCounts, outputDir, rasterFormat):
         for runIndex in range(RUNS):
             with getDbConnection() as (conn, cur):
                 cur.execute(f"TRUNCATE TABLE {SANDBOX_SCHEMA_NAME}.viewer RESTART IDENTITY CASCADE;")
-                cur.execute(f"DROP INDEX IF EXISTS {SANDBOX_SCHEMA_NAME}.viewer_name_idx;")
+                cur.execute(f"DROP INDEX IF EXISTS {SANDBOX_SCHEMA_NAME}.first_name_idx;")
 
                 def insertWithoutIndex():
                     dataGenerator = RandomDataGenerator()
@@ -256,33 +277,33 @@ def measureStringInsertExperiment(rowCounts, outputDir, rasterFormat):
 
 def measureFtsSingleWordExperiment(rowCounts, outputDir, rasterFormat):
     def ftsSingleTest(cur, rowCount):
-        words = ["adventure", "action", "comedy", "drama", "thriller", "romance"]
+        words = ["Dark", "Knight", "Matrix", "Pulp", "Fiction", "Star"]
         targetWord = random.choice(words)
-        cur.execute(f"SELECT movie_id, title FROM {SANDBOX_SCHEMA_NAME}.movie WHERE to_tsvector('russian', description) @@ plainto_tsquery('russian', %s)", (targetWord,))
+        cur.execute(f"SELECT movie_id, title FROM {SANDBOX_SCHEMA_NAME}.movie WHERE to_tsvector('english', title) @@ plainto_tsquery('english', %s)", (targetWord,))
         cur.fetchall()
 
-    indexSql = f"CREATE INDEX IF NOT EXISTS movie_description_fts_idx ON {SANDBOX_SCHEMA_NAME}.movie USING gin(to_tsvector('russian', description));"
-    results1, results2 = _executeIndexExperiment('movie', 'description', indexSql, ftsSingleTest, rowCounts, 'fts_single_word_effect.csv', 'FTS SINGLE WORD')
+    indexSql = f"CREATE INDEX IF NOT EXISTS title_fts_idx ON {SANDBOX_SCHEMA_NAME}.movie USING gin(to_tsvector('english', title));"
+    results1, results2 = _executeIndexExperiment('movie', 'title', indexSql, ftsSingleTest, rowCounts, 'fts_single_word_effect.csv', 'FTS SINGLE WORD')
 
     csvPath = outputDir + '/fts_single_word_effect.csv'
     plotPath = outputDir + '/fts_single_word_effect' if rasterFormat else None
-    _saveResults(results1, results2, csvPath, plotPath, 'Эффект полнотекстового индекса (одно слово)', 'С FTS индексом', 'Без индекса (LIKE)', 'Количество строк в таблице')
+    _saveResults(results1, results2, csvPath, plotPath, 'Эффект полнотекстового индекса (одно слово)', 'С FTS индексом', 'Без индекса', 'Количество строк в таблице')
 
     return results1, results2
 
 def measureFtsMultiWordExperiment(rowCounts, outputDir, rasterFormat):
     def ftsMultiTest(cur, rowCount):
-        wordPairs = ["action adventure", "romantic comedy", "science fiction", "horror thriller", "family drama"]
+        wordPairs = ["Dark Knight", "Star Wars", "Pulp Fiction", "Fight Club", "The Matrix"]
         targetPhrase = random.choice(wordPairs)
-        cur.execute(f"SELECT movie_id, title FROM {SANDBOX_SCHEMA_NAME}.movie WHERE to_tsvector('russian', description) @@ plainto_tsquery('russian', %s)", (targetPhrase,))
+        cur.execute(f"SELECT movie_id, title FROM {SANDBOX_SCHEMA_NAME}.movie WHERE to_tsvector('english', title) @@ plainto_tsquery('english', %s)", (targetPhrase,))
         cur.fetchall()
 
-    indexSql = f"CREATE INDEX IF NOT EXISTS movie_description_fts_idx ON {SANDBOX_SCHEMA_NAME}.movie USING gin(to_tsvector('russian', description));"
-    results1, results2 = _executeIndexExperiment('movie', 'description', indexSql, ftsMultiTest, rowCounts, 'fts_multi_word_effect.csv', 'FTS MULTI WORD')
+    indexSql = f"CREATE INDEX IF NOT EXISTS title_fts_idx ON {SANDBOX_SCHEMA_NAME}.movie USING gin(to_tsvector('english', title));"
+    results1, results2 = _executeIndexExperiment('movie', 'title', indexSql, ftsMultiTest, rowCounts, 'fts_multi_word_effect.csv', 'FTS MULTI WORD')
 
     csvPath = outputDir + '/fts_multi_word_effect.csv'
     plotPath = outputDir + '/fts_multi_word_effect' if rasterFormat else None
-    _saveResults(results1, results2, csvPath, plotPath, 'Эффект полнотекстового индекса (несколько слов)', 'С FTS индексом', 'Без индекса (LIKE)', 'Количество строк в таблице')
+    _saveResults(results1, results2, csvPath, plotPath, 'Эффект полнотекстового индекса (несколько слов)', 'С FTS индексом', 'Без индекса', 'Количество строк в таблице')
 
     return results1, results2
 
@@ -299,7 +320,7 @@ def measureFtsInsertExperiment(rowCounts, outputDir, rasterFormat):
         for runIndex in range(RUNS):
             with getDbConnection() as (conn, cur):
                 cur.execute(f"TRUNCATE TABLE {SANDBOX_SCHEMA_NAME}.movie RESTART IDENTITY CASCADE;")
-                cur.execute(f"CREATE INDEX IF NOT EXISTS movie_description_fts_idx ON {SANDBOX_SCHEMA_NAME}.movie USING gin(to_tsvector('russian', description));")
+                cur.execute(f"CREATE INDEX IF NOT EXISTS title_fts_idx ON {SANDBOX_SCHEMA_NAME}.movie USING gin(to_tsvector('english', title));")
 
                 def insertWithIndex():
                     dataGenerator = RandomDataGenerator()
@@ -315,7 +336,7 @@ def measureFtsInsertExperiment(rowCounts, outputDir, rasterFormat):
         for runIndex in range(RUNS):
             with getDbConnection() as (conn, cur):
                 cur.execute(f"TRUNCATE TABLE {SANDBOX_SCHEMA_NAME}.movie RESTART IDENTITY CASCADE;")
-                cur.execute(f"DROP INDEX IF EXISTS {SANDBOX_SCHEMA_NAME}.movie_description_fts_idx;")
+                cur.execute(f"DROP INDEX IF EXISTS {SANDBOX_SCHEMA_NAME}.title_fts_idx;")
 
                 def insertWithoutIndex():
                     dataGenerator = RandomDataGenerator()

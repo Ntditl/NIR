@@ -50,12 +50,13 @@ def measureExecutionTime(func):
     endTime = timeit.default_timer()
     return endTime - startTime, result
 
-def measureAverageTime(func):
-    times = []
-    for i in range(REPEATS_DEFAULT):
-        executionTime, result = measureExecutionTime(func)
-        times.append(executionTime)
-    return sum(times) / len(times), result
+def measureAverageTime(func, repeats=None):
+    if repeats is None:
+        repeats = REPEATS_DEFAULT
+    times = timeit.repeat(func, repeat=repeats, number=1)
+    avgTime = sum(times) / len(times)
+    result = func()
+    return avgTime, result
 
 def buildSeriesDict(results):
     seriesDict = {}

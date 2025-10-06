@@ -1,7 +1,10 @@
 from lib.db.connection import getDbConnection
 from lib.db.models import getTableNames
 import os
-from datetime import datetime
+from datetime import datetime, timezone
+import csv
+import tempfile
+import psycopg2
 
 TIME_FORMAT = '%Y%m%d_%H%M%S'
 
@@ -25,7 +28,7 @@ class BackupManager:
         return entries
 
     def backupAllTables(self) -> str:
-        timestamp = datetime.utcnow().strftime(TIME_FORMAT)
+        timestamp = datetime.now(timezone.utc).strftime(TIME_FORMAT)
         targetDir = os.path.join(self.backupDirectory, timestamp)
         os.makedirs(targetDir, exist_ok=True)
         with getDbConnection() as (databaseConnection, dbCursor):
@@ -71,30 +74,75 @@ class BackupManager:
                 if os.path.exists(filePath):
                     if tableName == 'ticket' and ticketTriggerPresent:
                         dbCursor.execute('ALTER TABLE ticket DISABLE TRIGGER trg_ticket_reserve;')
-                    with open(filePath, mode='r', encoding='utf-8', newline='') as inFile:
-                        sql = 'COPY ' + tableName + ' FROM STDIN WITH (FORMAT CSV, HEADER TRUE)'
-                        dbCursor.copy_expert(sql, inFile)
+                    dbCursor.execute("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=%s ORDER BY ordinal_position", (tableName,))
+                    currentCols = [r[0] for r in dbCursor.fetchall()]
+                    needsRemap = False
+                    csvCols = []
+                    with open(filePath, 'r', encoding='utf-8', newline='') as fIn:
+                        reader = csv.reader(fIn)
+                        try:
+                            header = next(reader)
+                        except StopIteration:
+                            header = []
+                        csvCols = header
+                        if header != currentCols:
+                            needsRemap = True
+                    if needsRemap:
+                        intersectCols = [c for c in currentCols if c in csvCols]
+                        if len(intersectCols) == 0:
+                            if tableName == 'ticket' and ticketTriggerPresent:
+                                dbCursor.execute('ALTER TABLE ticket ENABLE TRIGGER trg_ticket_reserve;')
+                            continue
+                        tempFd, tempPath = tempfile.mkstemp(suffix='.csv')
+                        os.close(tempFd)
+                        with open(filePath, 'r', encoding='utf-8', newline='') as fIn, open(tempPath, 'w', encoding='utf-8', newline='') as fOut:
+                            reader = csv.DictReader(fIn)
+                            writer = csv.DictWriter(fOut, fieldnames=intersectCols)
+                            writer.writeheader()
+                            for row in reader:
+                                filtered = {k: row.get(k, '') for k in intersectCols}
+                                writer.writerow(filtered)
+                        colList = '(' + ','.join(intersectCols) + ')'
+                        with open(tempPath, 'r', encoding='utf-8', newline='') as fTmp:
+                            sql = 'COPY ' + tableName + ' ' + colList + ' FROM STDIN WITH (FORMAT CSV, HEADER TRUE)'
+                            dbCursor.copy_expert(sql, fTmp)
+                        os.remove(tempPath)
+                    else:
+                        with open(filePath, mode='r', encoding='utf-8', newline='') as inFile:
+                            sql = 'COPY ' + tableName + ' FROM STDIN WITH (FORMAT CSV, HEADER TRUE)'
+                            dbCursor.copy_expert(sql, inFile)
                     if tableName == 'ticket' and ticketTriggerPresent:
                         dbCursor.execute('ALTER TABLE ticket ENABLE TRIGGER trg_ticket_reserve;')
             for i in range(len(self.tableNames)):
                 tableName = self.tableNames[i]
+                # реальные колонки текущей схемы public
                 dbCursor.execute(
-                    "SELECT column_name FROM information_schema.columns WHERE table_name = %s AND column_default LIKE 'nextval%%'",
+                    "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name = %s",
+                    (tableName,)
+                )
+                publicCols = set(r[0] for r in dbCursor.fetchall())
+                # кандидаты с nextval (могут приехать из старого дефекта / устаревших default в старом дампе)
+                dbCursor.execute(
+                    "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name = %s AND column_default LIKE 'nextval%%'",
                     (tableName,)
                 )
                 rows = dbCursor.fetchall()
                 for j in range(len(rows)):
                     col = rows[j][0]
+                    if col not in publicCols:
+                        continue
                     dbCursor.execute(
                         'SELECT pg_get_serial_sequence(%s, %s)',
                         (tableName, col)
                     )
                     seqRow = dbCursor.fetchone()
                     if seqRow is not None and seqRow[0] is not None:
-                        dbCursor.execute('SELECT COALESCE(MAX(' + col + '), 0) FROM ' + tableName)
-                        maxId = dbCursor.fetchone()[0]
+                        try:
+                            dbCursor.execute('SELECT COALESCE(MAX(' + col + '), 0) FROM ' + tableName)
+                            maxId = dbCursor.fetchone()[0]
+                        except psycopg2.Error:
+                            continue
                         if maxId is None or maxId < 1:
-                            # пустая таблица после восстановления: ставим 1 и is_called = false
                             dbCursor.execute(
                                 'SELECT setval(%s, %s, %s)',
                                 (seqRow[0], 1, False)

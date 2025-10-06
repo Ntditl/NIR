@@ -18,7 +18,7 @@ def selectNumberField(rowCounts):
             dataGenerator.generateMovies(rowCount)
 
             def selectByNumberField():
-                targetDuration = random.choice([90, 120, 150, 180])
+                targetDuration = random.randint(90, 180)
                 cur.execute("SELECT movie_id, title, duration_minutes FROM " + SANDBOX_SCHEMA_NAME + ".movie WHERE duration_minutes = %s", (targetDuration,))
                 return cur.fetchall()
 
@@ -35,13 +35,13 @@ def selectDateField(rowCounts):
         print('SELECT DATE исследование rowCount', rowCount, flush=True)
 
         with getDbConnection() as (conn, cur):
-            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".session RESTART IDENTITY CASCADE;")
+            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".viewer RESTART IDENTITY CASCADE;")
             dataGenerator = RandomDataGenerator()
             dataGenerator.setSchemaPrefix(SANDBOX_SCHEMA_NAME + ".")
-            dataGenerator.generateSessions(rowCount)
+            dataGenerator.generateViewers(rowCount)
 
             def selectByDateField():
-                cur.execute("SELECT session_id, session_datetime FROM " + SANDBOX_SCHEMA_NAME + ".session WHERE session_datetime >= CURRENT_DATE")
+                cur.execute("SELECT viewer_id, first_name, birth_date FROM " + SANDBOX_SCHEMA_NAME + ".viewer WHERE birth_date >= '1990-01-01'")
                 return cur.fetchall()
 
             avgTime, lastResult = measureAverageTime(selectByDateField)
@@ -77,17 +77,26 @@ def measureDeleteWhere(rowCounts):
         print('DELETE WHERE исследование rowCount', rowCount, flush=True)
 
         with getDbConnection() as (conn, cur):
-            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".movie_review RESTART IDENTITY CASCADE;")
+            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".favorite_movies RESTART IDENTITY CASCADE;")
+            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".viewer RESTART IDENTITY CASCADE;")
+            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".movie RESTART IDENTITY CASCADE;")
+
             dataGenerator = RandomDataGenerator()
             dataGenerator.setSchemaPrefix(SANDBOX_SCHEMA_NAME + ".")
-            dataGenerator.generateMovieReviews(rowCount)
+            dataGenerator.generateViewers(rowCount)
+            dataGenerator.generateMovies(rowCount)
+            dataGenerator.generateFavoriteMovies(rowCount)
 
-            def deleteByRating():
-                targetRating = random.randint(1, 5)
-                cur.execute("DELETE FROM " + SANDBOX_SCHEMA_NAME + ".movie_review WHERE rating = %s", (targetRating,))
-                return cur.rowcount
+            def deleteByMovieId():
+                cur.execute("SELECT movie_id FROM " + SANDBOX_SCHEMA_NAME + ".movie LIMIT 1")
+                result = cur.fetchone()
+                if result:
+                    targetMovieId = result[0]
+                    cur.execute("DELETE FROM " + SANDBOX_SCHEMA_NAME + ".favorite_movies WHERE movie_id = %s", (targetMovieId,))
+                    return cur.rowcount
+                return 0
 
-            avgTime, lastResult = measureAverageTime(deleteByRating)
+            avgTime, lastResult = measureAverageTime(deleteByMovieId)
             results[rowCount] = avgTime
 
     return results
@@ -100,62 +109,57 @@ def measureJoinOperations(rowCounts):
         print('JOIN операции исследование rowCount', rowCount, flush=True)
 
         with getDbConnection() as (conn, cur):
-            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".session RESTART IDENTITY CASCADE;")
-            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".ticket RESTART IDENTITY CASCADE;")
-
-            dataGenerator = RandomDataGenerator()
-            dataGenerator.setSchemaPrefix(SANDBOX_SCHEMA_NAME + ".")
-            dataGenerator.generateSessions(rowCount)
-            dataGenerator.generateTickets(rowCount * 2)
-
-            def joinSessionsWithTickets():
-                cur.execute("""
-                    SELECT s.session_id, s.session_datetime, t.ticket_id, t.seat_number
-                    FROM {}.session s
-                    INNER JOIN {}.ticket t ON s.session_id = t.session_id
-                    WHERE s.session_datetime >= CURRENT_DATE
-                    LIMIT 100
-                """.format(SANDBOX_SCHEMA_NAME, SANDBOX_SCHEMA_NAME))
-                return cur.fetchall()
-
-            avgTime, lastResult = measureAverageTime(joinSessionsWithTickets)
-            results[rowCount] = avgTime
-
-    return results
-
-def measureComplexJoinOperations(rowCounts):
-    results = {}
-    ensureBaseDataMinimalInSandbox()
-
-    for rowCount in rowCounts:
-        print('Сложные JOIN операции исследование rowCount', rowCount, flush=True)
-
-        with getDbConnection() as (conn, cur):
-            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".session RESTART IDENTITY CASCADE;")
-            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".ticket RESTART IDENTITY CASCADE;")
-            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".movie_review RESTART IDENTITY CASCADE;")
+            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".favorite_movies RESTART IDENTITY CASCADE;")
+            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".viewer RESTART IDENTITY CASCADE;")
             cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".movie RESTART IDENTITY CASCADE;")
 
             dataGenerator = RandomDataGenerator()
             dataGenerator.setSchemaPrefix(SANDBOX_SCHEMA_NAME + ".")
+            dataGenerator.generateViewers(rowCount)
             dataGenerator.generateMovies(rowCount)
-            dataGenerator.generateSessions(rowCount)
-            dataGenerator.generateTickets(rowCount * 2)
-            dataGenerator.generateMovieReviews(rowCount)
+            dataGenerator.generateFavoriteMovies(rowCount * 2)
 
-            def complexJoin():
+            def joinViewerWithFavorites():
                 cur.execute("""
-                    SELECT m.title, s.session_datetime, t.seat_number, r.rating
-                    FROM {}.movie m
-                    INNER JOIN {}.session s ON m.movie_id = s.movie_id
-                    INNER JOIN {}.ticket t ON s.session_id = t.session_id
-                    LEFT JOIN {}.movie_review r ON m.movie_id = r.movie_id
-                    WHERE m.rating >= 7
-                    LIMIT 50
-                """.format(SANDBOX_SCHEMA_NAME, SANDBOX_SCHEMA_NAME, SANDBOX_SCHEMA_NAME, SANDBOX_SCHEMA_NAME))
+                    SELECT v.viewer_id, v.first_name, m.title, fm.added_date
+                    FROM {}.viewer v
+                    INNER JOIN {}.favorite_movies fm ON v.viewer_id = fm.viewer_id
+                    INNER JOIN {}.movie m ON fm.movie_id = m.movie_id
+                    LIMIT 100
+                """.format(SANDBOX_SCHEMA_NAME, SANDBOX_SCHEMA_NAME, SANDBOX_SCHEMA_NAME))
                 return cur.fetchall()
 
-            avgTime, lastResult = measureAverageTime(complexJoin)
+            avgTime, lastResult = measureAverageTime(joinViewerWithFavorites)
+            results[rowCount] = avgTime
+
+    return results
+
+def measureOneToOneJoin(rowCounts):
+    results = {}
+    ensureBaseDataMinimalInSandbox()
+
+    for rowCount in rowCounts:
+        print('One-to-One JOIN исследование rowCount', rowCount, flush=True)
+
+        with getDbConnection() as (conn, cur):
+            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".viewer_profile RESTART IDENTITY CASCADE;")
+            cur.execute("TRUNCATE TABLE " + SANDBOX_SCHEMA_NAME + ".viewer RESTART IDENTITY CASCADE;")
+
+            dataGenerator = RandomDataGenerator()
+            dataGenerator.setSchemaPrefix(SANDBOX_SCHEMA_NAME + ".")
+            dataGenerator.generateViewers(rowCount)
+            dataGenerator.generateViewerProfiles(rowCount)
+
+            def oneToOneJoin():
+                cur.execute("""
+                    SELECT v.viewer_id, v.first_name, v.email, vp.nickname, vp.theme
+                    FROM {}.viewer v
+                    INNER JOIN {}.viewer_profile vp ON v.viewer_id = vp.viewer_id
+                    LIMIT 100
+                """.format(SANDBOX_SCHEMA_NAME, SANDBOX_SCHEMA_NAME))
+                return cur.fetchall()
+
+            avgTime, lastResult = measureAverageTime(oneToOneJoin)
             results[rowCount] = avgTime
 
     return results
@@ -180,11 +184,11 @@ def measureManyToManyJoin(rowCounts):
 
             def manyToManyJoin():
                 cur.execute("""
-                    SELECT v.name, m.title
+                    SELECT v.first_name, v.last_name, m.title, m.genre
                     FROM {}.viewer v
                     INNER JOIN {}.favorite_movies fm ON v.viewer_id = fm.viewer_id
                     INNER JOIN {}.movie m ON fm.movie_id = m.movie_id
-                    WHERE v.age >= 18
+                    WHERE m.duration_minutes >= 120
                     LIMIT 100
                 """.format(SANDBOX_SCHEMA_NAME, SANDBOX_SCHEMA_NAME, SANDBOX_SCHEMA_NAME))
                 return cur.fetchall()

@@ -37,7 +37,7 @@ def test_backup_all_tables(temp_backup_dir):
     backup_path = manager.backupAllTables()
 
     assert os.path.exists(backup_path)
-    assert os.path.exists(os.path.join(backup_path, 'viewer.csv'))
+    assert os.path.exists(os.path.join(backup_path, 'backup.sql'))
 
 def test_restore_all_tables(clean_backup_dir):
     from lib.db.models import recreateAllTables

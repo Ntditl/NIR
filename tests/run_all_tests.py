@@ -12,6 +12,7 @@ def run_all_tests():
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
     test_files = [
+        os.path.join(current_dir, 'test_connection.py'),
         os.path.join(current_dir, 'test_models.py'),
         os.path.join(current_dir, 'test_generators.py'),
         os.path.join(current_dir, 'test_dataManager.py'),
@@ -22,15 +23,16 @@ def run_all_tests():
     ]
 
     print("\nЗапуск тестов для проверки пункта 4 ТЗ:")
-    print("4a. Создание таблиц (test_models.py)")
-    print("4b. Генерация данных (test_generators.py)")
-    print("4c. Песочница (test_sandboxManager.py)")
-    print("4d. Сохранение данных (включено в test_generators.py)")
-    print("4e. Удаление/замена данных (test_dataManager.py)")
-    print("4f. Бэкап и восстановление (test_backupManager.py)")
-    print("4g. Автоматический commit (включено во все тесты)")
-    print("4h. Измерение времени timeit (test_researchUtils.py)")
-    print("4i. Построение графиков (test_plots.py)")
+    print("4a. Подключение к БД (test_connection.py)")
+    print("4b. Создание таблиц (test_models.py)")
+    print("4c. Генерация данных (test_generators.py)")
+    print("4d. Песочница (test_sandboxManager.py)")
+    print("4e. Сохранение данных (включено в test_generators.py)")
+    print("4f. Удаление/замена данных (test_dataManager.py)")
+    print("4g. Бэкап и восстановление (test_backupManager.py)")
+    print("4h. Автоматический commit (включено во все тесты)")
+    print("4i. Измерение времени timeit (test_researchUtils.py)")
+    print("4j. Построение графиков (test_plots.py)")
     print("\n" + "=" * SEPARATOR_LINE_WIDTH + "\n")
 
     exit_code = pytest.main(['-v', '--tb=short'] + test_files)

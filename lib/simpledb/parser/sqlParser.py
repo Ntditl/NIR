@@ -53,12 +53,21 @@ def parseSql(sqlText: str):
         rawVals = []
         buf = ''
         inside = False
+        quoteChar = None
         i = 0
         while i < len(valsPart):
             ch = valsPart[i]
-            if ch == '"':
-                inside = not inside
-                buf = buf + ch
+            if ch in ('"', "'"):
+                if quoteChar is None:
+                    quoteChar = ch
+                    inside = True
+                    buf = buf + ch
+                elif quoteChar == ch:
+                    inside = False
+                    quoteChar = None
+                    buf = buf + ch
+                else:
+                    buf = buf + ch
             elif ch == ',' and not inside:
                 rawVals.append(buf.strip())
                 buf = ''
@@ -71,7 +80,7 @@ def parseSql(sqlText: str):
         i = 0
         while i < len(rawVals):
             v = rawVals[i]
-            if v.startswith('"') and v.endswith('"') and len(v) >= 2:
+            if (v.startswith('"') and v.endswith('"') and len(v) >= 2) or (v.startswith("'") and v.endswith("'") and len(v) >= 2):
                 values.append(v[1:-1])
             else:
                 values.append(int(v))
@@ -90,7 +99,7 @@ def parseSql(sqlText: str):
             if eqPos >= 0:
                 left = wherePart[:eqPos].strip()
                 right = wherePart[eqPos+1:].strip()
-                if right.startswith('"') and right.endswith('"') and len(right) >= 2:
+                if (right.startswith('"') and right.endswith('"') and len(right) >= 2) or (right.startswith("'") and right.endswith("'") and len(right) >= 2):
                     where = (left, right[1:-1])
                 else:
                     try:
@@ -126,7 +135,7 @@ def parseSql(sqlText: str):
         if eqPos >= 0:
             left = wherePart[:eqPos].strip()
             right = wherePart[eqPos+1:].strip()
-            if right.startswith('"') and right.endswith('"') and len(right) >= 2:
+            if (right.startswith('"') and right.endswith('"') and len(right) >= 2) or (right.startswith("'") and right.endswith("'") and len(right) >= 2):
                 return {'type': 'delete_where', 'data': {'table': tableName, 'where': (left, right[1:-1])}}
             try:
                 return {'type': 'delete_where', 'data': {'table': tableName, 'where': (left, int(right))}}
@@ -134,4 +143,3 @@ def parseSql(sqlText: str):
                 return {'type': 'delete_where', 'data': {'table': tableName, 'where': (left, right)}}
         return {'type': 'noop'}
     return {'type': 'noop'}
-

@@ -5,7 +5,7 @@ from .schema import Schema
 from .paths import TableFiles
 from .engine.table_engine import TableEngine
 from .indexes import IntIndex
-from .parser.sql_parser import parseSql
+from .parser.sqlParser import parseSql
 
 class SimpleDatabase:
     def __init__(self, dataDir=DATA_DIR):

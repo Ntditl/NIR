@@ -1,3 +1,3 @@
-from .int_index import IntIndex
-from .str_index import StrIndex
+from .intIndex import IntIndex
+from .strIndex import StrIndex
 __all__ = ['IntIndex','StrIndex']

@@ -1,6 +1,6 @@
 import pytest
 import timeit
-from investigations.researchUtils import measureAverageTime, REPEATS_DEFAULT
+from lib.managers.researchUtils import measureAverageTime, REPEATS_DEFAULT
 
 def test_measure_average_time_uses_timeit_repeat():
     call_count = 0

@@ -45,10 +45,9 @@ def medianValue(values):
     return (sortedArray[middleIndex - 1] + sortedArray[middleIndex]) / 2.0
 
 def measureExecutionTime(func):
-    startTime = timeit.default_timer()
+    executionTime = timeit.timeit(func, number=1)
     result = func()
-    endTime = timeit.default_timer()
-    return endTime - startTime, result
+    return executionTime, result
 
 def measureAverageTime(func, repeats=None):
     if repeats is None:

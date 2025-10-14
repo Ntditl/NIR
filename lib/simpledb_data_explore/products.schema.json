@@ -1,0 +1,1 @@
+{"table": "products", "columns": [{"name": "product_id", "type": "INT"}, {"name": "title", "type": "VARCHAR", "max": 30}, {"name": "price", "type": "INT"}]}

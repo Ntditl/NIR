@@ -50,6 +50,12 @@ def exploreSimpleDB():
     db.execute("CREATE TABLE products (product_id INT, title VARCHAR(30), price INT)")
 
     print("\n" + "="*80)
+    print("СОЗДАЁМ ИНДЕКС НА products.product_id")
+    print("="*80)
+    db.execute("CREATE INDEX ON products(product_id)")
+    print("Индекс создан на колонке product_id")
+
+    print("\n" + "="*80)
     print("ВСТАВЛЯЕМ ДАННЫЕ В products")
     print("="*80)
     db.execute("INSERT INTO products (product_id, title, price) VALUES (10, 'Laptop', 1000)")

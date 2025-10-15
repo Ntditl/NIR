@@ -27,16 +27,10 @@ def recreateTables():
 
 def generateSampleData():
     generator = RandomDataGenerator()
-    generator.generateData(
-        viewersCount=10,
-        moviesCount=10,
-        cinemasCount=3,
-        hallsPerCinema=2,
-        sessionsPerHall=3,
-        favoriteRate=0.2,
-        reviewRate=0.2,
-        ticketRate=0.3
-    )
+    generator.generateViewers(10)
+    generator.generateMovies(10)
+    generator.generateViewerProfiles(5)
+    generator.generateFavoriteMovies(15)
     print("Примерные данные сгенерированы")
 
 

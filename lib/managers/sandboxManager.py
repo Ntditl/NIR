@@ -70,11 +70,41 @@ class SandboxManager:
             for i in range(len(fkData)):
                 childTable, conName, conDef = fkData[i]
                 defText = conDef.replace('REFERENCES public.', 'REFERENCES ' + self.sandboxSchemaName + '.')
+
+                refPos = defText.find('REFERENCES ')
+                while refPos != -1:
+                    startPos = refPos + 11
+                    endPos = startPos
+                    while endPos < len(defText) and (defText[endPos].isalnum() or defText[endPos] == '_'):
+                        endPos += 1
+
+                    if endPos < len(defText) and defText[endPos] == '(':
+                        tableName = defText[startPos:endPos]
+                        if '.' not in tableName:
+                            defText = defText[:startPos] + self.sandboxSchemaName + '.' + defText[startPos:]
+                            endPos += len(self.sandboxSchemaName) + 1
+
+                    refPos = defText.find('REFERENCES ', endPos)
+
                 cur.execute("ALTER TABLE " + self.sandboxSchemaName + "." + childTable + " ADD CONSTRAINT " + conName + " " + defText)
 
     def dropSandboxSchema(self):
         with getDbConnection() as (conn, cur):
             cur.execute("DROP SCHEMA IF EXISTS " + self.sandboxSchemaName + " CASCADE;")
+
+    def resetSandbox(self):
+        self.createSandboxSchema()
+
+    def ensureMinimalData(self):
+        from lib.data.generators import RandomDataGenerator
+        with getDbConnection() as (conn, cur):
+            cur.execute("SELECT COUNT(*) FROM " + self.sandboxSchemaName + ".viewer")
+            viewerCount = cur.fetchone()[0]
+
+        if viewerCount < 10:
+            dataGenerator = RandomDataGenerator()
+            dataGenerator.setSchemaPrefix(self.sandboxSchemaName + ".")
+            dataGenerator.generateMinimalDataset(10, 10, 10, 15)
 
     def _getPublicTables(self, cur):
         cur.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public';")

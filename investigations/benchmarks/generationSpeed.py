@@ -9,7 +9,6 @@ REPEATS = 3
 FAST_THRESHOLD = 0.01
 MEDIUM_THRESHOLD = 0.1
 CATEGORIES_CSV_NAME = 'generation_speed_categories.csv'
-ROW_COUNTS_SINGLE_START = [5, 50, 100, 150, 200, 250,300,350,400,450]
 
 
 def _getColumnsInfo(tableName):
@@ -68,24 +67,13 @@ def _generateTableRows(tableName, rowCount):
 def _generateRelatedGroup(tablesSequence, rowCount):
     generated = {}
     for t in tablesSequence:
-        if t == 'hall':
-            generated['cinema'] = _generateTableRows('cinema', rowCount)
-            generated['hall'] = _generateTableRows('hall', rowCount)
-        elif t == 'viewer_profile':
+        if t == 'viewer_profile':
             generated['viewer'] = _generateTableRows('viewer', rowCount)
             generated['viewer_profile'] = _generateTableRows('viewer_profile', rowCount)
         elif t == 'favorite_movies':
             generated['viewer'] = _generateTableRows('viewer', rowCount)
             generated['movie'] = _generateTableRows('movie', rowCount)
             generated['favorite_movies'] = _generateTableRows('favorite_movies', rowCount)
-        elif t == 'movie_review':
-            generated['viewer'] = _generateTableRows('viewer', rowCount)
-            generated['movie'] = _generateTableRows('movie', rowCount)
-            generated['movie_review'] = _generateTableRows('movie_review', rowCount)
-        elif t == 'session':
-            generated['movie'] = _generateTableRows('movie', rowCount)
-            generated['hall'] = _generateTableRows('hall', rowCount)
-            generated['session'] = _generateTableRows('session', rowCount)
     return generated
 
 
@@ -185,11 +173,9 @@ def measureGenerationSpeed(
     else:
         for name in tablesConfig:
             selectedTables.append(name)
-    rowCounts = ROW_COUNTS_SINGLE_START
-    fkGroups = []
-    if isinstance(tablesConfig, dict):
-        if 'fkGroups' in tablesConfig:
-            fkGroups = tablesConfig['fkGroups']
+
+    rowCounts = tablesConfig['rowCounts']
+    fkGroups = tablesConfig.get('fkGroups', [])
 
     print('Старт измерений генерации. Таблиц', len(selectedTables), 'групп', len(fkGroups), 'ряды', rowCounts, flush=True)
 
@@ -223,15 +209,15 @@ def measureGenerationSpeed(
     if outDir != "" and not os.path.isdir(outDir):
         os.makedirs(outDir, exist_ok=True)
     with open(outputCsvPath, 'w', newline='', encoding='utf-8') as csvf:
-        csvf.write('subject,rows,time_seconds\n')
+        csvf.write('subject,type,rows,time_seconds\n')
         for table in resultsSingle:
             series = resultsSingle[table]
             for point in series:
-                csvf.write(f"{table},{point[0]},{point[1]:.6f}\n")
+                csvf.write(f"{table},single,{point[0]},{point[1]:.6f}\n")
         for group in resultsGroups:
             series = resultsGroups[group]
             for point in series:
-                csvf.write(f"{group},{point[0]},{point[1]:.6f}\n")
+                csvf.write(f"{group},fk_group,{point[0]},{point[1]:.6f}\n")
 
     if outputImagePath:
         outDir = os.path.dirname(outputImagePath)

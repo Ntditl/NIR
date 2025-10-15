@@ -7,9 +7,6 @@ from lib.simpledb.paths import TableFiles
 from lib.simpledb.engine.table_engine import TableEngine
 from lib.visualization.plots import PlotBuilder
 
-ROW_COUNTS = [100, 300, 600, 850, 1000]
-REPEATS = 3
-QUERIES_PER_RUN = 100
 RANDOM_SEED_NUMBER = 12345
 RANDOM_SEED_STRING = 43210
 BASE_TEMP_DIR = os.path.join(os.path.dirname(__file__), 'foldersForSimpleDb')
@@ -66,26 +63,26 @@ def populateStringTable(engine, rowCount, seedValue):
 def buildIndex(engine, columnName):
     engine._rebuildSingleIndex(columnName)
 
-def measureSelectPerformance(engine, dataType, withIndex, rowCount):
+def measureSelectPerformance(engine, dataType, withIndex, rowCount, queriesPerRun):
     totalTime = 0
 
     if dataType == 'number':
-        for _ in range(QUERIES_PER_RUN):
+        for _ in range(queriesPerRun):
             targetId = random.randint(1, rowCount)
             startTime = time.perf_counter()
-            results = engine.selectWhere("id", targetId)
+            results = engine.select(['*'], ('id', targetId))
             endTime = time.perf_counter()
             totalTime += (endTime - startTime)
     else:
         names = ["Alice", "Bob", "Charlie", "Diana", "Edward", "Fiona", "George", "Helen"]
-        for _ in range(QUERIES_PER_RUN):
+        for _ in range(queriesPerRun):
             targetName = random.choice(names) + str(random.randint(1, rowCount) % 100)
             startTime = time.perf_counter()
-            results = engine.selectWhere("name", targetName)
+            results = engine.select(['*'], ('name', targetName))
             endTime = time.perf_counter()
             totalTime += (endTime - startTime)
 
-    return totalTime / QUERIES_PER_RUN
+    return totalTime / queriesPerRun
 
 def measureInsertPerformance(engine, dataType, insertCount):
     if dataType == 'number':
@@ -103,11 +100,11 @@ def measureInsertPerformance(engine, dataType, insertCount):
 
     return endTime - startTime
 
-def measureDeletePerformance(engine, dataType, rowCount):
+def measureDeletePerformance(engine, dataType, rowCount, queriesPerRun):
     totalTime = 0
 
     if dataType == 'number':
-        for _ in range(QUERIES_PER_RUN):
+        for _ in range(queriesPerRun):
             targetId = random.randint(1, rowCount)
             startTime = time.perf_counter()
             engine.deleteWhere("id", targetId)
@@ -115,16 +112,16 @@ def measureDeletePerformance(engine, dataType, rowCount):
             totalTime += (endTime - startTime)
     else:
         names = ["Alice", "Bob", "Charlie", "Diana", "Edward", "Fiona", "George", "Helen"]
-        for _ in range(QUERIES_PER_RUN):
+        for _ in range(queriesPerRun):
             targetName = random.choice(names) + str(random.randint(1, rowCount) % 100)
             startTime = time.perf_counter()
             engine.deleteWhere("name", targetName)
             endTime = time.perf_counter()
             totalTime += (endTime - startTime)
 
-    return totalTime / QUERIES_PER_RUN
+    return totalTime / queriesPerRun
 
-def runSelectBenchmark(dataType, resultsDir, showPlots):
+def runSelectBenchmark(dataType, resultsDir, showPlots, rowCounts, repeats, queriesPerRun):
     dataDir = os.path.join(BASE_TEMP_DIR, f'select_{dataType}')
     csvFile = f'simpledb_select_{dataType}.csv'
     plotFile = f'simpledb_select_{dataType}'
@@ -135,13 +132,13 @@ def runSelectBenchmark(dataType, resultsDir, showPlots):
 
     results = []
 
-    for rowCount in ROW_COUNTS:
+    for rowCount in rowCounts:
         print(f"SimpleDB SELECT {dataType}: тестируем {rowCount} строк")
 
         timesWithIndex = []
         timesWithoutIndex = []
 
-        for repeat in range(REPEATS):
+        for repeat in range(repeats):
             schemaWithIndex = createSchema("test_indexed", dataType, True)
             schemaWithoutIndex = createSchema("test_plain", dataType, False)
 
@@ -157,8 +154,8 @@ def runSelectBenchmark(dataType, resultsDir, showPlots):
 
             buildIndex(engineWithIndex, indexColumn)
 
-            timeWithIndex = measureSelectPerformance(engineWithIndex, dataType, True, rowCount)
-            timeWithoutIndex = measureSelectPerformance(engineWithoutIndex, dataType, False, rowCount)
+            timeWithIndex = measureSelectPerformance(engineWithIndex, dataType, True, rowCount, queriesPerRun)
+            timeWithoutIndex = measureSelectPerformance(engineWithoutIndex, dataType, False, rowCount, queriesPerRun)
 
             timesWithIndex.append(timeWithIndex)
             timesWithoutIndex.append(timeWithoutIndex)
@@ -178,21 +175,28 @@ def runSelectBenchmark(dataType, resultsDir, showPlots):
             f.write(f"{row[0]},{row[1]},{row[2]}\n")
 
     if showPlots:
-        plotPath = os.path.join(resultsDir, plotFile)
-        builder = PlotBuilder()
-        builder.setTitle(f"SimpleDB SELECT WHERE по {dataType} полю")
-        builder.setXLabel("Количество строк")
-        builder.setYLabel("Время выполнения (сек)")
+        plotPath = plotFile
+        builder = PlotBuilder(resultsDir)
 
         xValues = [r[0] for r in results]
         yWithIndex = [r[1] for r in results]
         yWithoutIndex = [r[2] for r in results]
 
-        builder.addSeries(xValues, yWithIndex, "С индексом")
-        builder.addSeries(xValues, yWithoutIndex, "Без индекса")
-        builder.savePlot(plotPath)
+        seriesData = {
+            'С индексом': (xValues, yWithIndex),
+            'Без индекса': (xValues, yWithoutIndex)
+        }
 
-def runInsertBenchmark(dataType, resultsDir, showPlots):
+        builder.buildChart(
+            seriesData,
+            f"SimpleDB SELECT WHERE по {dataType} полю",
+            "Количество строк",
+            "Время выполнения (сек)",
+            plotPath,
+            True
+        )
+
+def runInsertBenchmark(dataType, resultsDir, showPlots, rowCounts, repeats):
     dataDir = os.path.join(BASE_TEMP_DIR, f'insert_{dataType}')
     csvFile = f'simpledb_insert_{dataType}.csv'
     plotFile = f'simpledb_insert_{dataType}'
@@ -202,13 +206,13 @@ def runInsertBenchmark(dataType, resultsDir, showPlots):
 
     results = []
 
-    for rowCount in ROW_COUNTS:
+    for rowCount in rowCounts:
         print(f"SimpleDB INSERT {dataType}: тестируем {rowCount} строк")
 
         timesWithIndex = []
         timesWithoutIndex = []
 
-        for repeat in range(REPEATS):
+        for repeat in range(repeats):
             schemaWithIndex = createSchema("test_indexed", dataType, True)
             schemaWithoutIndex = createSchema("test_plain", dataType, False)
 
@@ -238,21 +242,28 @@ def runInsertBenchmark(dataType, resultsDir, showPlots):
             f.write(f"{row[0]},{row[1]},{row[2]}\n")
 
     if showPlots:
-        plotPath = os.path.join(resultsDir, plotFile)
-        builder = PlotBuilder()
-        builder.setTitle(f"SimpleDB INSERT по {dataType} полю")
-        builder.setXLabel("Количество вставляемых строк")
-        builder.setYLabel("Время выполнения (сек)")
+        plotPath = plotFile
+        builder = PlotBuilder(resultsDir)
 
         xValues = [r[0] for r in results]
         yWithIndex = [r[1] for r in results]
         yWithoutIndex = [r[2] for r in results]
 
-        builder.addSeries(xValues, yWithIndex, "С индексом")
-        builder.addSeries(xValues, yWithoutIndex, "Без индекса")
-        builder.savePlot(plotPath)
+        seriesData = {
+            'С индексом': (xValues, yWithIndex),
+            'Без индекса': (xValues, yWithoutIndex)
+        }
 
-def runDeleteBenchmark(dataType, resultsDir, showPlots):
+        builder.buildChart(
+            seriesData,
+            f"SimpleDB INSERT по {dataType} полю",
+            "Количество вставляемых строк",
+            "Время выполнения (сек)",
+            plotPath,
+            True
+        )
+
+def runDeleteBenchmark(dataType, resultsDir, showPlots, rowCounts, repeats, queriesPerRun):
     dataDir = os.path.join(BASE_TEMP_DIR, f'delete_{dataType}')
     csvFile = f'simpledb_delete_{dataType}.csv'
     plotFile = f'simpledb_delete_{dataType}'
@@ -263,13 +274,13 @@ def runDeleteBenchmark(dataType, resultsDir, showPlots):
 
     results = []
 
-    for rowCount in ROW_COUNTS:
+    for rowCount in rowCounts:
         print(f"SimpleDB DELETE {dataType}: тестируем {rowCount} строк")
 
         timesWithIndex = []
         timesWithoutIndex = []
 
-        for repeat in range(REPEATS):
+        for repeat in range(repeats):
             schemaWithIndex = createSchema("test_indexed", dataType, True)
             schemaWithoutIndex = createSchema("test_plain", dataType, False)
 
@@ -285,8 +296,8 @@ def runDeleteBenchmark(dataType, resultsDir, showPlots):
 
             buildIndex(engineWithIndex, indexColumn)
 
-            timeWithIndex = measureDeletePerformance(engineWithIndex, dataType, rowCount)
-            timeWithoutIndex = measureDeletePerformance(engineWithoutIndex, dataType, rowCount)
+            timeWithIndex = measureDeletePerformance(engineWithIndex, dataType, rowCount, queriesPerRun)
+            timeWithoutIndex = measureDeletePerformance(engineWithoutIndex, dataType, rowCount, queriesPerRun)
 
             timesWithIndex.append(timeWithIndex)
             timesWithoutIndex.append(timeWithoutIndex)
@@ -306,34 +317,41 @@ def runDeleteBenchmark(dataType, resultsDir, showPlots):
             f.write(f"{row[0]},{row[1]},{row[2]}\n")
 
     if showPlots:
-        plotPath = os.path.join(resultsDir, plotFile)
-        builder = PlotBuilder()
-        builder.setTitle(f"SimpleDB DELETE WHERE по {dataType} полю")
-        builder.setXLabel("Количество строк в таблице")
-        builder.setYLabel("Время выполнения (сек)")
+        plotPath = plotFile
+        builder = PlotBuilder(resultsDir)
 
         xValues = [r[0] for r in results]
         yWithIndex = [r[1] for r in results]
         yWithoutIndex = [r[2] for r in results]
 
-        builder.addSeries(xValues, yWithIndex, "С индексом")
-        builder.addSeries(xValues, yWithoutIndex, "Без индекса")
-        builder.savePlot(plotPath)
+        seriesData = {
+            'С индексом': (xValues, yWithIndex),
+            'Без индекса': (xValues, yWithoutIndex)
+        }
 
-def runSimpleDbSelectNumber(resultsDir, showPlots):
-    runSelectBenchmark('number', resultsDir, showPlots)
+        builder.buildChart(
+            seriesData,
+            f"SimpleDB DELETE WHERE по {dataType} полю",
+            "Количество строк в таблице",
+            "Время выполнения (сек)",
+            plotPath,
+            True
+        )
 
-def runSimpleDbSelectString(resultsDir, showPlots):
-    runSelectBenchmark('string', resultsDir, showPlots)
+def runSimpleDbSelectNumber(resultsDir, showPlots, rowCounts, repeats, queriesPerRun):
+    runSelectBenchmark('number', resultsDir, showPlots, rowCounts, repeats, queriesPerRun)
 
-def runSimpleDbInsertNumber(resultsDir, showPlots):
-    runInsertBenchmark('number', resultsDir, showPlots)
+def runSimpleDbSelectString(resultsDir, showPlots, rowCounts, repeats, queriesPerRun):
+    runSelectBenchmark('string', resultsDir, showPlots, rowCounts, repeats, queriesPerRun)
 
-def runSimpleDbInsertString(resultsDir, showPlots):
-    runInsertBenchmark('string', resultsDir, showPlots)
+def runSimpleDbInsertNumber(resultsDir, showPlots, rowCounts, repeats):
+    runInsertBenchmark('number', resultsDir, showPlots, rowCounts, repeats)
 
-def runSimpleDbDeleteNumber(resultsDir, showPlots):
-    runDeleteBenchmark('number', resultsDir, showPlots)
+def runSimpleDbInsertString(resultsDir, showPlots, rowCounts, repeats):
+    runInsertBenchmark('string', resultsDir, showPlots, rowCounts, repeats)
 
-def runSimpleDbDeleteString(resultsDir, showPlots):
-    runDeleteBenchmark('string', resultsDir, showPlots)
+def runSimpleDbDeleteNumber(resultsDir, showPlots, rowCounts, repeats, queriesPerRun):
+    runDeleteBenchmark('number', resultsDir, showPlots, rowCounts, repeats, queriesPerRun)
+
+def runSimpleDbDeleteString(resultsDir, showPlots, rowCounts, repeats, queriesPerRun):
+    runDeleteBenchmark('string', resultsDir, showPlots, rowCounts, repeats, queriesPerRun)

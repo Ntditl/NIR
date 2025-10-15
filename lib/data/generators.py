@@ -52,6 +52,87 @@ class RandomDataGenerator:
                 if isinstance(val, str):
                     self.usedEmails.add(val.lower())
 
+    def generateMinimalDataset(self, viewerCount, movieCount, profileCount, favoriteCount):
+        with getDbConnection() as (conn, cur):
+            self._ensureEmailsLoaded(cur)
+
+            first_names = ["Alice", "Bob", "Charlie", "Diana", "Edward", "Fiona", "George", "Helen"]
+            last_names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis"]
+
+            viewerIds = []
+            for i in range(viewerCount):
+                first_name = random.choice(first_names)
+                last_name = random.choice(last_names) + str(i)
+                email = self._randomEmail()
+                birth_date = self._randomDate(1970, 2005)
+                cur.execute(f"""
+                    INSERT INTO {self._getTableName('viewer')} (first_name, last_name, email, birth_date) 
+                    VALUES (%s, %s, %s, %s) RETURNING viewer_id
+                """, (first_name, last_name, email, birth_date))
+                viewerId = cur.fetchone()[0]
+                viewerIds.append(viewerId)
+
+            genres = ["Action", "Comedy", "Drama", "Horror", "Romance", "Sci-Fi"]
+            movie_titles = [
+                "The Dark Knight", "Inception", "Pulp Fiction", "The Matrix",
+                "Fight Club", "Interstellar", "The Godfather", "Forrest Gump",
+                "The Shawshank Redemption", "Goodfellas", "Star Wars", "Gladiator"
+            ]
+
+            movieIds = []
+            for i in range(movieCount):
+                base_title = random.choice(movie_titles)
+                title = f"{base_title} {i}" if i > 0 else base_title
+                genre = random.choice(genres)
+                duration_minutes = random.randint(90, 180)
+                release_date = self._randomDate(2000, 2023)
+                cur.execute(f"""
+                    INSERT INTO {self._getTableName('movie')} 
+                    (title, genre, duration_minutes, release_date) 
+                    VALUES (%s, %s, %s, %s) RETURNING movie_id
+                """, (title, genre, duration_minutes, release_date))
+                movieIds.append(cur.fetchone()[0])
+
+            themes = ["dark", "light", "blue", "green", "red"]
+            profilesAdded = 0
+
+            for viewer_id in viewerIds:
+                if profilesAdded >= profileCount:
+                    break
+                nickname = f"user_{viewer_id}_{self._randomString(4)}"
+                avatar_path = f"/avatars/{viewer_id}.jpg"
+                theme = random.choice(themes)
+                registration_date = self._randomDate(2015, 2023)
+                cur.execute(f"""
+                    INSERT INTO {self._getTableName('viewer_profile')} 
+                    (viewer_id, nickname, avatar_path, theme, registration_date) 
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (viewer_id, nickname, avatar_path, theme, registration_date))
+                profilesAdded += 1
+
+            favoritesAdded = 0
+            attempts = 0
+            maxAttempts = favoriteCount * 3
+
+            while favoritesAdded < favoriteCount and attempts < maxAttempts:
+                viewer_id = random.choice(viewerIds)
+                movie_id = random.choice(movieIds)
+                attempts += 1
+
+                cur.execute(f"""
+                    SELECT COUNT(*) FROM {self._getTableName('favorite_movies')} 
+                    WHERE viewer_id = %s AND movie_id = %s
+                """, (viewer_id, movie_id))
+
+                if cur.fetchone()[0] == 0:
+                    added_date = self._randomDate(2020, 2023)
+                    cur.execute(f"""
+                        INSERT INTO {self._getTableName('favorite_movies')} 
+                        (viewer_id, movie_id, added_date) 
+                        VALUES (%s, %s, %s)
+                    """, (viewer_id, movie_id, added_date))
+                    favoritesAdded += 1
+
     def generateViewers(self, count):
         with getDbConnection() as (conn, cur):
             self._ensureEmailsLoaded(cur)

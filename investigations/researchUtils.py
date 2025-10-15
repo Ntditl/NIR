@@ -1,5 +1,6 @@
 import os
 import random
+import sys
 import timeit
 from decimal import Decimal
 from datetime import datetime, timezone
@@ -9,29 +10,9 @@ from lib.data.generators import RandomDataGenerator
 from lib.visualization.plots import PlotBuilder
 from lib.managers.sandboxManager import SandboxManager
 
-ROW_COUNTS_DEFAULT = [5, 50]
-REPEATS_DEFAULT = 3
-RANDOM_SEED = 12345
-USE_OPTIMIZED_FLOW = True
-PK_ROW_COUNTS = [10, 50]
-STRING_INDEX_ROW_COUNTS = [1000, 5000]
-PK_RUNS = 5
-PK_QUERIES_PER_RUN = 100
-STRING_QUERIES = 100
-STRING_INDEX_SAMPLE_QUERIES = 100
-FTS_ROW_COUNTS = [1000, 5000, 10000, 20000, 40000]
-FTS_SAMPLE_QUERIES = 100
-FTS_MULTI_SAMPLE_QUERIES = 100
-FTS_DICTIONARY = [
-    'error','warning','timeout','failure','success','update','insert','delete','select','commit',
-    'rollback','network','disk','memory','cache','index','table','query','plan','analyze',
-    'optimize','engine','thread','process','batch','user','session','login','logout','permission',
-    'denied','granted','read','write','latency','throughput','overflow','underflow','exception','handler'
-]
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-random.seed(RANDOM_SEED)
-
-SANDBOX_SCHEMA_NAME = 'research_sandbox'
+SANDBOX_SCHEMA_NAME = 'sandbox_research'
 
 def medianValue(values):
     valueLength = len(values)
@@ -49,9 +30,7 @@ def measureExecutionTime(func):
     result = func()
     return executionTime, result
 
-def measureAverageTime(func, repeats=None):
-    if repeats is None:
-        repeats = REPEATS_DEFAULT
+def measureAverageTime(func, repeats=3):
     times = timeit.repeat(func, repeat=repeats, number=1)
     avgTime = sum(times) / len(times)
     result = func()

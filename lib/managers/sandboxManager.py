@@ -6,11 +6,32 @@ class SandboxManager:
 
     def createSandboxSchema(self):
         with getDbConnection() as (conn, cur):
+            print(f"Удаление старой схемы {self.sandboxSchemaName}...", flush=True)
+
+            print("  Завершение активных подключений к схеме...", flush=True)
+            cur.execute("""
+                SELECT pg_terminate_backend(pid)
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+                AND pid <> pg_backend_pid()
+                AND query ILIKE %s
+            """, (f'%{self.sandboxSchemaName}%',))
+
+            print("  Принудительное удаление схемы...", flush=True)
             cur.execute("DROP SCHEMA IF EXISTS " + self.sandboxSchemaName + " CASCADE;")
+            print(f"  Схема {self.sandboxSchemaName} удалена", flush=True)
+
+            print(f"Создание новой схемы {self.sandboxSchemaName}...", flush=True)
             cur.execute("CREATE SCHEMA " + self.sandboxSchemaName + ";")
+
+            print("Получение списка таблиц из public схемы...", flush=True)
             tableNames = self._getPublicTables(cur)
+            print(f"Найдено таблиц: {len(tableNames)}", flush=True)
+
             seqPlans = {}
             createPlans = {}
+
+            print("Анализ структуры таблиц...", flush=True)
             for i in range(len(tableNames)):
                 tableName = tableNames[i]
                 colsInfo = self._getColumns(cur, tableName)
@@ -42,8 +63,11 @@ class SandboxManager:
                 createSql = "CREATE TABLE " + self.sandboxSchemaName + "." + tableName + " (" + ",".join(colLines) + ");"
                 createPlans[tableName] = createSql
                 seqPlans[tableName] = serialCols
+
+            print("Создание таблиц в песочнице...", flush=True)
             for i in range(len(tableNames)):
                 tbl = tableNames[i]
+                print(f"  Создание таблицы {tbl}...", flush=True)
                 cur.execute(createPlans[tbl])
                 serialCols = seqPlans[tbl]
                 for k in range(len(serialCols)):
@@ -51,9 +75,14 @@ class SandboxManager:
                     seqName = self.sandboxSchemaName + "." + tbl + "_" + col + "_seq"
                     cur.execute("CREATE SEQUENCE " + seqName + ";")
                     cur.execute("ALTER TABLE " + self.sandboxSchemaName + "." + tbl + " ALTER COLUMN " + col + " SET DEFAULT nextval('" + seqName + "');")
+
+            print("Копирование данных из public схемы...", flush=True)
             for i in range(len(tableNames)):
                 tbl = tableNames[i]
+                print(f"  Копирование данных таблицы {tbl}...", flush=True)
                 cur.execute("INSERT INTO " + self.sandboxSchemaName + "." + tbl + " SELECT * FROM public." + tbl + ";")
+
+            print("Синхронизация последовательностей...", flush=True)
             for i in range(len(tableNames)):
                 tbl = tableNames[i]
                 serialCols = seqPlans[tbl]
@@ -66,6 +95,8 @@ class SandboxManager:
                         cur.execute("SELECT setval('" + seqName + "', 1, false)")
                     else:
                         cur.execute("SELECT setval('" + seqName + "', " + str(maxVal) + ", true)")
+
+            print("Создание внешних ключей...", flush=True)
             fkData = self._getForeignKeys(cur)
             for i in range(len(fkData)):
                 childTable, conName, conDef = fkData[i]
@@ -88,6 +119,8 @@ class SandboxManager:
 
                 cur.execute("ALTER TABLE " + self.sandboxSchemaName + "." + childTable + " ADD CONSTRAINT " + conName + " " + defText)
 
+            print(f"Схема {self.sandboxSchemaName} успешно создана!", flush=True)
+
     def dropSandboxSchema(self):
         with getDbConnection() as (conn, cur):
             cur.execute("DROP SCHEMA IF EXISTS " + self.sandboxSchemaName + " CASCADE;")
@@ -98,13 +131,29 @@ class SandboxManager:
     def ensureMinimalData(self):
         from lib.data.generators import RandomDataGenerator
         with getDbConnection() as (conn, cur):
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = %s 
+                    AND table_name = 'viewer'
+                )
+            """, (self.sandboxSchemaName,))
+            tableExists = cur.fetchone()[0]
+
+            if not tableExists:
+                print(f"Таблица {self.sandboxSchemaName}.viewer не существует, пропускаем ensureMinimalData", flush=True)
+                return
+
             cur.execute("SELECT COUNT(*) FROM " + self.sandboxSchemaName + ".viewer")
             viewerCount = cur.fetchone()[0]
 
         if viewerCount < 10:
+            print(f"В таблице viewer только {viewerCount} записей, генерируем минимальный набор данных...", flush=True)
             dataGenerator = RandomDataGenerator()
             dataGenerator.setSchemaPrefix(self.sandboxSchemaName + ".")
             dataGenerator.generateMinimalDataset(10, 10, 10, 15)
+        else:
+            print(f"В таблице viewer уже {viewerCount} записей, генерация не требуется", flush=True)
 
     def _getPublicTables(self, cur):
         cur.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public';")

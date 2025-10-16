@@ -31,13 +31,13 @@
   },
   "indexResearch": {
     "pkRowCounts": [100, 500, 1000, 2000, 3000],
-    "pkRuns": 5,
-    "pkQueriesPerRun": 100,
+    "pkRuns": 1,
+    "pkQueriesPerRun": 10,
     "stringIndexRowCounts": [100, 500, 1000, 2000, 3000],
-    "stringQueriesPerRun": 100,
+    "stringQueriesPerRun": 10,
     "ftsRowCounts": [100, 500, 1000, 1500, 2000],
-    "ftsSampleQueries": 100,
-    "ftsMultiSampleQueries": 100,
+    "ftsSampleQueries": 10,
+    "ftsMultiSampleQueries": 10,
     "ftsDictionary": [
       "error", "warning", "timeout", "failure", "success", "update", "insert", "delete", "select", "commit",
       "rollback", "network", "disk", "memory", "cache", "index", "table", "query", "plan", "analyze",

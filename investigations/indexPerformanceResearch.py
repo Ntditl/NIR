@@ -11,8 +11,8 @@ from lib.visualization.plots import PlotBuilder
 from lib.utils.timing import measureAverageTime
 from investigations.researchUtils import SANDBOX_SCHEMA_NAME
 
-RUNS = 5
-QUERIES_PER_RUN = 100
+RUNS = 1
+QUERIES_PER_RUN = 10
 
 
 def _createTableCopyWithoutPk(sourceTable, targetTable):
@@ -37,7 +37,10 @@ def _createTableCopyWithoutIndex(sourceTable, targetTable, indexName):
 
 
 def _fillTableWithData(tableName, rowCount):
+    print(f'  [LOG] _fillTableWithData: начало для {tableName}, rowCount={rowCount}', flush=True)
+
     with getDbConnection() as (conn, cur):
+        print(f'  [LOG] _fillTableWithData: проверка существования таблицы', flush=True)
         cur.execute(f"""
             SELECT EXISTS (
                 SELECT FROM information_schema.tables 
@@ -46,20 +49,33 @@ def _fillTableWithData(tableName, rowCount):
             )
         """)
         tableExists = cur.fetchone()[0]
+        print(f'  [LOG] _fillTableWithData: таблица {tableName} существует={tableExists}', flush=True)
 
         if tableExists:
+            print(f'  [LOG] _fillTableWithData: выполняю TRUNCATE для {tableName}', flush=True)
             cur.execute(f"TRUNCATE TABLE {SANDBOX_SCHEMA_NAME}.{tableName} RESTART IDENTITY CASCADE;")
+            print(f'  [LOG] _fillTableWithData: TRUNCATE выполнен и закоммичен', flush=True)
 
-        dataGenerator = RandomDataGenerator()
-        dataGenerator.setSchemaPrefix(SANDBOX_SCHEMA_NAME + ".")
-        if tableName == 'movie' or tableName.startswith('movie_'):
-            dataGenerator.generateMovies(rowCount)
-        elif tableName == 'viewer':
-            dataGenerator.generateViewers(rowCount)
-        elif tableName == 'viewer_profile':
-            dataGenerator.generateViewers(rowCount)
-            dataGenerator.generateViewerProfiles(rowCount)
-        print(f"Таблица {tableName} заполнена {rowCount} строками", flush=True)
+    print(f'  [LOG] _fillTableWithData: создаю генератор данных', flush=True)
+    dataGenerator = RandomDataGenerator()
+    dataGenerator.setSchemaPrefix(SANDBOX_SCHEMA_NAME + ".")
+    print(f'  [LOG] _fillTableWithData: генератор создан, начинаю генерацию данных', flush=True)
+
+    if tableName == 'movie' or tableName.startswith('movie_'):
+        print(f'  [LOG] _fillTableWithData: вызываю generateMovies({rowCount})', flush=True)
+        dataGenerator.generateMovies(rowCount)
+        print(f'  [LOG] _fillTableWithData: generateMovies завершен', flush=True)
+    elif tableName == 'viewer':
+        print(f'  [LOG] _fillTableWithData: вызываю generateViewers({rowCount})', flush=True)
+        dataGenerator.generateViewers(rowCount)
+        print(f'  [LOG] _fillTableWithData: generateViewers завершен', flush=True)
+    elif tableName == 'viewer_profile':
+        print(f'  [LOG] _fillTableWithData: вызываю generateViewers и generateViewerProfiles', flush=True)
+        dataGenerator.generateViewers(rowCount)
+        dataGenerator.generateViewerProfiles(rowCount)
+        print(f'  [LOG] _fillTableWithData: генерация завершена', flush=True)
+
+    print(f"Таблица {tableName} заполнена {rowCount} строками", flush=True)
 
 
 def measurePkIndexEffect(rowCounts, resultsDir, savePlot):
@@ -72,17 +88,29 @@ def measurePkIndexEffect(rowCounts, resultsDir, savePlot):
     for rowCount in rowCounts:
         print(f'PK индекс: тест для {rowCount} строк', flush=True)
 
+        print(f'[LOG] measurePkIndexEffect: вызываю _fillTableWithData', flush=True)
         _fillTableWithData(tableWithPk, rowCount)
+        print(f'[LOG] measurePkIndexEffect: _fillTableWithData завершен', flush=True)
+
+        print(f'[LOG] measurePkIndexEffect: вызываю _createTableCopyWithoutPk', flush=True)
         _createTableCopyWithoutPk(tableWithPk, tableNoPk)
+        print(f'[LOG] measurePkIndexEffect: _createTableCopyWithoutPk завершен', flush=True)
 
         totalTimeWithPk = 0.0
         totalTimeNoPk = 0.0
 
+        totalQueries = RUNS * QUERIES_PER_RUN
+        print(f'  Выполняем {totalQueries} запросов ({RUNS} раундов по {QUERIES_PER_RUN} запросов)...', flush=True)
+
         for runIndex in range(RUNS):
+            print(f'  Раунд {runIndex + 1}/{RUNS}...', flush=True)
+
             for queryIndex in range(QUERIES_PER_RUN):
-                searchId = random.randint(1, rowCount)
+                if queryIndex % 20 == 0:
+                    print(f'    [LOG] запрос {queryIndex + 1}/{QUERIES_PER_RUN}', flush=True)
 
                 def queryWithPk():
+                    searchId = random.randint(1, rowCount)
                     with getDbConnection() as (conn, cur):
                         cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableWithPk} WHERE movie_id = {searchId}")
                         rows = cur.fetchall()
@@ -91,6 +119,7 @@ def measurePkIndexEffect(rowCounts, resultsDir, savePlot):
                 totalTimeWithPk += timeWithPk
 
                 def queryNoPk():
+                    searchId = random.randint(1, rowCount)
                     with getDbConnection() as (conn, cur):
                         cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableNoPk} WHERE movie_id = {searchId}")
                         rows = cur.fetchall()
@@ -98,8 +127,8 @@ def measurePkIndexEffect(rowCounts, resultsDir, savePlot):
                 timeNoPk = measureAverageTime(queryNoPk, repeats=1)
                 totalTimeNoPk += timeNoPk
 
-        avgTimeWithPk = totalTimeWithPk / (RUNS * QUERIES_PER_RUN)
-        avgTimeNoPk = totalTimeNoPk / (RUNS * QUERIES_PER_RUN)
+        avgTimeWithPk = totalTimeWithPk / totalQueries
+        avgTimeNoPk = totalTimeNoPk / totalQueries
 
         resultsWithPk.append({'count': rowCount, 'time': avgTimeWithPk})
         resultsNoPk.append({'count': rowCount, 'time': avgTimeNoPk})
@@ -289,15 +318,18 @@ def measureStringIndexExperiment(rowCounts, resultsDir, savePlot):
         totalTimeWithIdx = 0.0
         totalTimeNoIdx = 0.0
 
+        sampleTitles = []
         with getDbConnection() as (conn, cur):
             cur.execute(f"SELECT title FROM {SANDBOX_SCHEMA_NAME}.{tableWithIdx} LIMIT 10")
-            sampleTitles = [row[0] for row in cur.fetchall()]
+            for row in cur.fetchall():
+                sampleTitles.append(row[0])
 
         for runIndex in range(RUNS):
             for queryIndex in range(QUERIES_PER_RUN):
-                searchTitle = sampleTitles[queryIndex % len(sampleTitles)]
+                titleIndex = queryIndex % len(sampleTitles)
 
                 def queryWithIdx():
+                    searchTitle = sampleTitles[titleIndex]
                     with getDbConnection() as (conn, cur):
                         cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableWithIdx} WHERE title = %s", (searchTitle,))
                         rows = cur.fetchall()
@@ -306,6 +338,7 @@ def measureStringIndexExperiment(rowCounts, resultsDir, savePlot):
                 totalTimeWithIdx += timeWithIdx
 
                 def queryNoIdx():
+                    searchTitle = sampleTitles[titleIndex]
                     with getDbConnection() as (conn, cur):
                         cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableNoIdx} WHERE title = %s", (searchTitle,))
                         rows = cur.fetchall()
@@ -443,9 +476,10 @@ def measureStringLikeContains(rowCounts, resultsDir, savePlot):
 
         for runIndex in range(RUNS):
             for queryIndex in range(QUERIES_PER_RUN):
-                substring = substrings[queryIndex % len(substrings)]
+                substringIndex = queryIndex % len(substrings)
 
                 def queryWithIdx():
+                    substring = substrings[substringIndex]
                     with getDbConnection() as (conn, cur):
                         cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableWithIdx} WHERE title LIKE %s", ('%' + substring + '%',))
                         rows = cur.fetchall()
@@ -454,6 +488,7 @@ def measureStringLikeContains(rowCounts, resultsDir, savePlot):
                 totalTimeWithIdx += timeWithIdx
 
                 def queryNoIdx():
+                    substring = substrings[substringIndex]
                     with getDbConnection() as (conn, cur):
                         cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableNoIdx} WHERE title LIKE %s", ('%' + substring + '%',))
                         rows = cur.fetchall()
@@ -583,7 +618,7 @@ def measureFtsSingleWordExperiment(rowCounts, resultsDir, savePlot):
         _fillTableWithData(tableWithIdx, rowCount)
 
         with getDbConnection() as (conn, cur):
-            cur.execute(f"CREATE INDEX IF NOT EXISTS {indexName} ON {SANDBOX_SCHEMA_NAME}.{tableWithIdx} USING gin(to_tsvector('english', description));")
+            cur.execute(f"CREATE INDEX IF NOT EXISTS {indexName} ON {SANDBOX_SCHEMA_NAME}.{tableWithIdx} USING gin(to_tsvector('english', coalesce(title, '') || ' ' || coalesce(genre, '')));")
 
         _createTableCopyWithoutIndex(tableWithIdx, tableNoIdx, indexName)
 
@@ -598,7 +633,7 @@ def measureFtsSingleWordExperiment(rowCounts, resultsDir, savePlot):
 
                 def queryWithIdx():
                     with getDbConnection() as (conn, cur):
-                        cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableWithIdx} WHERE to_tsvector('english', description) @@ to_tsquery(%s)", (word,))
+                        cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableWithIdx} WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(genre, '')) @@ to_tsquery(%s)", (word,))
                         rows = cur.fetchall()
 
                 timeWithIdx = measureAverageTime(queryWithIdx, repeats=1)
@@ -606,7 +641,7 @@ def measureFtsSingleWordExperiment(rowCounts, resultsDir, savePlot):
 
                 def queryNoIdx():
                     with getDbConnection() as (conn, cur):
-                        cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableNoIdx} WHERE to_tsvector('english', description) @@ to_tsquery(%s)", (word,))
+                        cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableNoIdx} WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(genre, '')) @@ to_tsquery(%s)", (word,))
                         rows = cur.fetchall()
 
                 timeNoIdx = measureAverageTime(queryNoIdx, repeats=1)
@@ -657,7 +692,7 @@ def measureFtsMultiWordExperiment(rowCounts, resultsDir, savePlot):
         _fillTableWithData(tableWithIdx, rowCount)
 
         with getDbConnection() as (conn, cur):
-            cur.execute(f"CREATE INDEX IF NOT EXISTS {indexName} ON {SANDBOX_SCHEMA_NAME}.{tableWithIdx} USING gin(to_tsvector('english', description));")
+            cur.execute(f"CREATE INDEX IF NOT EXISTS {indexName} ON {SANDBOX_SCHEMA_NAME}.{tableWithIdx} USING gin(to_tsvector('english', coalesce(title, '') || ' ' || coalesce(genre, '')));")
 
         _createTableCopyWithoutIndex(tableWithIdx, tableNoIdx, indexName)
 
@@ -668,19 +703,21 @@ def measureFtsMultiWordExperiment(rowCounts, resultsDir, savePlot):
 
         for runIndex in range(RUNS):
             for queryIndex in range(QUERIES_PER_RUN):
-                phrase = searchPhrases[queryIndex % len(searchPhrases)]
+                phraseIndex = queryIndex % len(searchPhrases)
 
                 def queryWithIdx():
+                    phrase = searchPhrases[phraseIndex]
                     with getDbConnection() as (conn, cur):
-                        cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableWithIdx} WHERE to_tsvector('english', description) @@ to_tsquery(%s)", (phrase,))
+                        cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableWithIdx} WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(genre, '')) @@ to_tsquery(%s)", (phrase,))
                         rows = cur.fetchall()
 
                 timeWithIdx = measureAverageTime(queryWithIdx, repeats=1)
                 totalTimeWithIdx += timeWithIdx
 
                 def queryNoIdx():
+                    phrase = searchPhrases[phraseIndex]
                     with getDbConnection() as (conn, cur):
-                        cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableNoIdx} WHERE to_tsvector('english', description) @@ to_tsquery(%s)", (phrase,))
+                        cur.execute(f"SELECT * FROM {SANDBOX_SCHEMA_NAME}.{tableNoIdx} WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(genre, '')) @@ to_tsquery(%s)", (phrase,))
                         rows = cur.fetchall()
 
                 timeNoIdx = measureAverageTime(queryNoIdx, repeats=1)
@@ -733,7 +770,7 @@ def measureFtsInsertExperiment(rowCounts, resultsDir, savePlot):
         _fillTableWithData(tableWithIdx, rowCount)
 
         with getDbConnection() as (conn, cur):
-            cur.execute(f"CREATE INDEX IF NOT EXISTS {indexName} ON {SANDBOX_SCHEMA_NAME}.{tableWithIdx} USING gin(to_tsvector('english', description));")
+            cur.execute(f"CREATE INDEX IF NOT EXISTS {indexName} ON {SANDBOX_SCHEMA_NAME}.{tableWithIdx} USING gin(to_tsvector('english', coalesce(title, '') || ' ' || coalesce(genre, '')));")
 
         _createTableCopyWithoutIndex(tableWithIdx, tableNoIdx, indexName)
 
@@ -744,7 +781,7 @@ def measureFtsInsertExperiment(rowCounts, resultsDir, savePlot):
             def insertWithIdx():
                 with getDbConnection() as (conn, cur):
                     for i in range(insertCount):
-                        cur.execute(f"INSERT INTO {SANDBOX_SCHEMA_NAME}.{tableWithIdx} (title, genre, duration_minutes, release_date, description) VALUES ('FTS Test', 'Sci-Fi', 110, '2024-01-01', 'A thrilling adventure story')")
+                        cur.execute(f"INSERT INTO {SANDBOX_SCHEMA_NAME}.{tableWithIdx} (title, genre, duration_minutes, release_date) VALUES ('FTS Test', 'Sci-Fi', 110, '2024-01-01')")
 
             timeWithIdx = measureAverageTime(insertWithIdx, repeats=1)
             totalTimeWithIdx += timeWithIdx
@@ -755,7 +792,7 @@ def measureFtsInsertExperiment(rowCounts, resultsDir, savePlot):
             def insertNoIdx():
                 with getDbConnection() as (conn, cur):
                     for i in range(insertCount):
-                        cur.execute(f"INSERT INTO {SANDBOX_SCHEMA_NAME}.{tableNoIdx} (title, genre, duration_minutes, release_date, description) VALUES ('FTS Test', 'Sci-Fi', 110, '2024-01-01', 'A thrilling adventure story')")
+                        cur.execute(f"INSERT INTO {SANDBOX_SCHEMA_NAME}.{tableNoIdx} (title, genre, duration_minutes, release_date) VALUES ('FTS Test', 'Sci-Fi', 110, '2024-01-01')")
 
             timeNoIdx = measureAverageTime(insertNoIdx, repeats=1)
             totalTimeNoIdx += timeNoIdx

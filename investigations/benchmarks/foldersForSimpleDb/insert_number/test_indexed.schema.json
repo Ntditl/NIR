@@ -1,0 +1,1 @@
+{"table": "test_indexed", "columns": [{"name": "id", "type": "INT", "index": true}, {"name": "val", "type": "INT"}]}

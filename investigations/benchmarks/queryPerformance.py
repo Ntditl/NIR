@@ -1,11 +1,11 @@
 import csv
-import timeit
 import os
 import re
 from typing import Dict, Any, List
 
 from lib.db.connection import getDbConnection
 from lib.visualization.plots import PlotBuilder
+from lib.utils.timing import measureExecutionTime
 
 DEFAULT_COUNTS = [100, 1000, 5000]
 ENCODING_UTF8 = 'utf-8'
@@ -57,7 +57,7 @@ def measureQueryPerformance(queriesConfig: List[Dict[str, Any]], outputCsvPath: 
                 def run():
                     with getDbConnection() as (conn, cur):
                         cur.execute(qsql)
-                t = timeit.Timer(run).timeit(number=1)
+                t = measureExecutionTime(run)
                 times.append(t)
                 if csql:
                     with getDbConnection() as (conn, cur):

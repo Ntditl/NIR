@@ -1,7 +1,7 @@
 import os
-import timeit
 from lib.simpledb import SimpleDatabase
 from lib.visualization.plots import PlotBuilder
+from lib.utils.timing import measureExecutionTime
 
 DEFAULT_ROW_COUNTS = [1000, 5000, 10000]
 CSV_FILENAME = 'simpledb_bench.csv'
@@ -36,9 +36,8 @@ def _measureCallable(repeats, fn):
     times = []
     index = 0
     while index < repeats:
-        timer = timeit.Timer(fn)
-        arr = timer.repeat(repeat=1, number=1)
-        times.append(arr[0])
+        executionTime = measureExecutionTime(fn)
+        times.append(executionTime)
         index = index + 1
     best = times[0]
     i = 1

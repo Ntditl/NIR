@@ -10,7 +10,7 @@ from lib.db.models import getCreateTablesSql
 from lib.managers.sandboxManager import SandboxManager
 from lib.visualization.plots import PlotBuilder
 from investigations.benchmarks.generationSpeed import measureGenerationSpeed
-from investigations.databaseOperationsResearch import selectNumberField, selectDateField, insertMovieData, measureDeleteWhere, measureJoinOperations, measureComplexJoinOperations, measureManyToManyJoin
+from investigations.databaseOperationsResearch import selectNumberField, selectNumberFieldViewer, selectNumberFieldViewerProfile, selectDateField, selectDateFieldViewer, selectDateFieldViewerProfile, insertMovieData, insertViewerData, insertViewerProfileData, measureDeleteWhere, measureDeleteWhereViewer, measureDeleteWhereViewerProfile, measureJoinOperations, measureComplexJoinOperations, measureManyToManyJoin
 from investigations.indexPerformanceResearch import measurePkIndexEffect, measurePkInequalityEffect, measurePkInsertEffect, measureStringIndexExperiment, measureStringLikePrefix, measureStringLikeContains, measureStringInsertExperiment, measureFtsSingleWordExperiment, measureFtsMultiWordExperiment, measureFtsInsertExperiment
 from investigations.researchUtils import SANDBOX_SCHEMA_NAME
 from investigations.benchmarks.simpledbBenchmarks import runSimpleDbDeleteNumber, runSimpleDbDeleteString, runSimpleDbInsertNumber, runSimpleDbInsertString, runSimpleDbSelectNumber, runSimpleDbSelectString
@@ -38,14 +38,15 @@ def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, di
         os.makedirs(resultsDir, exist_ok=True)
 
     subdirs = config.get('resultsSubdirectories', {})
-    generationDir = os.path.join(resultsDir, subdirs.get('generation', 'point5b_generation'))
+    generationSingleDir = os.path.join(resultsDir, subdirs.get('generationSingle', 'point5b_1'))
+    generationFkGroupsDir = os.path.join(resultsDir, subdirs.get('generationFkGroups', 'point5b_2'))
     operationsDir = os.path.join(resultsDir, subdirs.get('operations', 'point5c_operations'))
     pkIndexDir = os.path.join(resultsDir, subdirs.get('pkIndex', 'point6a_pk_index'))
     stringIndexDir = os.path.join(resultsDir, subdirs.get('stringIndex', 'point6b_string_index'))
     ftsIndexDir = os.path.join(resultsDir, subdirs.get('ftsIndex', 'point6c_fts_index'))
     simpleDbDir = os.path.join(resultsDir, subdirs.get('simpleDb', 'point7_simpledb'))
 
-    for directory in [generationDir, operationsDir, pkIndexDir, stringIndexDir, ftsIndexDir, simpleDbDir]:
+    for directory in [generationSingleDir, generationFkGroupsDir, operationsDir, pkIndexDir, stringIndexDir, ftsIndexDir, simpleDbDir]:
         if not os.path.isdir(directory):
             os.makedirs(directory, exist_ok=True)
 
@@ -113,13 +114,11 @@ def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, di
             )
 
     tablesConfig = config['tables']
-    generationResultsPath = os.path.join(generationDir, 'generation_speed.csv')
-    generationImagePath = os.path.join(generationDir, 'generation_speed.png')
-    print("Измеряю скорость генерации данных →", generationResultsPath, "и изображение →", generationImagePath)
+    print("Измеряю скорость генерации данных →", generationSingleDir, "и", generationFkGroupsDir)
     measureGenerationSpeed(
         tablesConfig=tablesConfig,
-        outputCsvPath=generationResultsPath,
-        outputImagePath=generationImagePath
+        outputSingleDir=generationSingleDir,
+        outputFkGroupsDir=generationFkGroupsDir
     )
 
     print("Запускаю исследования: DELETE, JOIN, PK, строковый индекс, FTS →", resultsDir)
@@ -135,85 +134,175 @@ def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, di
     try:
         print('=== ИССЛЕДОВАНИЯ ОПЕРАЦИЙ С ТАБЛИЦАМИ (ПУНКТ 5) ===', flush=True)
 
-        print('Исследование SELECT операций', flush=True)
-        selectNumberResults = selectNumberField(operationsRowCounts)
-        selectDateResults = selectDateField(operationsRowCounts)
+        print('Исследование SELECT операций по числовому полю для всех таблиц', flush=True)
+        selectNumberResultsMovie = selectNumberField(operationsRowCounts)
+        selectNumberResultsViewer = selectNumberFieldViewer(operationsRowCounts)
+        selectNumberResultsViewerProfile = selectNumberFieldViewerProfile(operationsRowCounts)
 
-        selectNumberCsv = os.path.join(operationsSelectNumberDir, 'select_number_field.csv')
-        with open(selectNumberCsv, 'w', encoding='utf-8') as f:
+        selectNumberCsvMovie = os.path.join(operationsSelectNumberDir, 'select_number_movie.csv')
+        with open(selectNumberCsvMovie, 'w', encoding='utf-8') as f:
             f.write('row_count,time_seconds\n')
-            for result in selectNumberResults:
+            for result in selectNumberResultsMovie:
+                f.write(f"{result['count']},{result['time']}\n")
+
+        selectNumberCsvViewer = os.path.join(operationsSelectNumberDir, 'select_number_viewer.csv')
+        with open(selectNumberCsvViewer, 'w', encoding='utf-8') as f:
+            f.write('row_count,time_seconds\n')
+            for result in selectNumberResultsViewer:
+                f.write(f"{result['count']},{result['time']}\n")
+
+        selectNumberCsvViewerProfile = os.path.join(operationsSelectNumberDir, 'select_number_viewer_profile.csv')
+        with open(selectNumberCsvViewerProfile, 'w', encoding='utf-8') as f:
+            f.write('row_count,time_seconds\n')
+            for result in selectNumberResultsViewerProfile:
                 f.write(f"{result['count']},{result['time']}\n")
 
         builder = PlotBuilder(operationsSelectNumberDir)
-        xValues = [r['count'] for r in selectNumberResults]
-        yValues = [r['time'] for r in selectNumberResults]
+        xValuesMovie = [r['count'] for r in selectNumberResultsMovie]
+        yValuesMovie = [r['time'] for r in selectNumberResultsMovie]
+        xValuesViewer = [r['count'] for r in selectNumberResultsViewer]
+        yValuesViewer = [r['time'] for r in selectNumberResultsViewer]
+        xValuesViewerProfile = [r['count'] for r in selectNumberResultsViewerProfile]
+        yValuesViewerProfile = [r['time'] for r in selectNumberResultsViewerProfile]
         builder.buildChart(
-            {'SELECT по числовому полю': (xValues, yValues)},
-            'SELECT WHERE по числовому полю',
+            {
+                'movie': (xValuesMovie, yValuesMovie),
+                'viewer': (xValuesViewer, yValuesViewer),
+                'viewer_profile': (xValuesViewerProfile, yValuesViewerProfile)
+            },
+            'SELECT WHERE по числовому полю (сравнение таблиц)',
             'Количество строк',
             'Время выполнения (сек)',
-            'select_number_field',
+            'select_number_field_comparison',
             True
         )
 
-        selectDateCsv = os.path.join(operationsSelectDateDir, 'select_date_field.csv')
-        with open(selectDateCsv, 'w', encoding='utf-8') as f:
+        print('Исследование SELECT операций по полю даты для всех таблиц', flush=True)
+        selectDateResultsMovie = selectDateField(operationsRowCounts)
+        selectDateResultsViewer = selectDateFieldViewer(operationsRowCounts)
+        selectDateResultsViewerProfile = selectDateFieldViewerProfile(operationsRowCounts)
+
+        selectDateCsvMovie = os.path.join(operationsSelectDateDir, 'select_date_movie.csv')
+        with open(selectDateCsvMovie, 'w', encoding='utf-8') as f:
             f.write('row_count,time_seconds\n')
-            for result in selectDateResults:
+            for result in selectDateResultsMovie:
+                f.write(f"{result['count']},{result['time']}\n")
+
+        selectDateCsvViewer = os.path.join(operationsSelectDateDir, 'select_date_viewer.csv')
+        with open(selectDateCsvViewer, 'w', encoding='utf-8') as f:
+            f.write('row_count,time_seconds\n')
+            for result in selectDateResultsViewer:
+                f.write(f"{result['count']},{result['time']}\n")
+
+        selectDateCsvViewerProfile = os.path.join(operationsSelectDateDir, 'select_date_viewer_profile.csv')
+        with open(selectDateCsvViewerProfile, 'w', encoding='utf-8') as f:
+            f.write('row_count,time_seconds\n')
+            for result in selectDateResultsViewerProfile:
                 f.write(f"{result['count']},{result['time']}\n")
 
         builder = PlotBuilder(operationsSelectDateDir)
-        xValues = [r['count'] for r in selectDateResults]
-        yValues = [r['time'] for r in selectDateResults]
+        xValuesMovie = [r['count'] for r in selectDateResultsMovie]
+        yValuesMovie = [r['time'] for r in selectDateResultsMovie]
+        xValuesViewer = [r['count'] for r in selectDateResultsViewer]
+        yValuesViewer = [r['time'] for r in selectDateResultsViewer]
+        xValuesViewerProfile = [r['count'] for r in selectDateResultsViewerProfile]
+        yValuesViewerProfile = [r['time'] for r in selectDateResultsViewerProfile]
         builder.buildChart(
-            {'SELECT по полю даты': (xValues, yValues)},
-            'SELECT WHERE по полю даты',
+            {
+                'movie': (xValuesMovie, yValuesMovie),
+                'viewer': (xValuesViewer, yValuesViewer),
+                'viewer_profile': (xValuesViewerProfile, yValuesViewerProfile)
+            },
+            'SELECT WHERE по полю даты (сравнение таблиц)',
             'Количество строк',
             'Время выполнения (сек)',
-            'select_date_field',
+            'select_date_field_comparison',
             True
         )
 
-        print('Исследование INSERT операций', flush=True)
-        insertResults = insertMovieData(operationsRowCounts)
+        print('Исследование INSERT операций для всех таблиц', flush=True)
+        insertResultsMovie = insertMovieData(operationsRowCounts)
+        insertResultsViewer = insertViewerData(operationsRowCounts)
+        insertResultsViewerProfile = insertViewerProfileData(operationsRowCounts)
 
-        insertCsv = os.path.join(operationsInsertDir, 'insert_operations.csv')
-        with open(insertCsv, 'w', encoding='utf-8') as f:
+        insertCsvMovie = os.path.join(operationsInsertDir, 'insert_movie.csv')
+        with open(insertCsvMovie, 'w', encoding='utf-8') as f:
             f.write('row_count,time_seconds\n')
-            for result in insertResults:
+            for result in insertResultsMovie:
+                f.write(f"{result['count']},{result['time']}\n")
+
+        insertCsvViewer = os.path.join(operationsInsertDir, 'insert_viewer.csv')
+        with open(insertCsvViewer, 'w', encoding='utf-8') as f:
+            f.write('row_count,time_seconds\n')
+            for result in insertResultsViewer:
+                f.write(f"{result['count']},{result['time']}\n")
+
+        insertCsvViewerProfile = os.path.join(operationsInsertDir, 'insert_viewer_profile.csv')
+        with open(insertCsvViewerProfile, 'w', encoding='utf-8') as f:
+            f.write('row_count,time_seconds\n')
+            for result in insertResultsViewerProfile:
                 f.write(f"{result['count']},{result['time']}\n")
 
         builder = PlotBuilder(operationsInsertDir)
-        xValues = [r['count'] for r in insertResults]
-        yValues = [r['time'] for r in insertResults]
+        xValuesMovie = [r['count'] for r in insertResultsMovie]
+        yValuesMovie = [r['time'] for r in insertResultsMovie]
+        xValuesViewer = [r['count'] for r in insertResultsViewer]
+        yValuesViewer = [r['time'] for r in insertResultsViewer]
+        xValuesViewerProfile = [r['count'] for r in insertResultsViewerProfile]
+        yValuesViewerProfile = [r['time'] for r in insertResultsViewerProfile]
         builder.buildChart(
-            {'INSERT операции': (xValues, yValues)},
-            'INSERT операции',
+            {
+                'movie': (xValuesMovie, yValuesMovie),
+                'viewer': (xValuesViewer, yValuesViewer),
+                'viewer_profile': (xValuesViewerProfile, yValuesViewerProfile)
+            },
+            'INSERT операции (сравнение таблиц)',
             'Количество вставляемых строк',
             'Время выполнения (сек)',
-            'insert_operations',
+            'insert_operations_comparison',
             True
         )
 
-        print('Исследование DELETE операций', flush=True)
-        deleteResults = measureDeleteWhere(operationsRowCounts)
+        print('Исследование DELETE операций для всех таблиц', flush=True)
+        deleteResultsMovie = measureDeleteWhere(operationsRowCounts)
+        deleteResultsViewer = measureDeleteWhereViewer(operationsRowCounts)
+        deleteResultsViewerProfile = measureDeleteWhereViewerProfile(operationsRowCounts)
 
-        deleteCsv = os.path.join(operationsDeleteDir, 'delete_operations.csv')
-        with open(deleteCsv, 'w', encoding='utf-8') as f:
+        deleteCsvMovie = os.path.join(operationsDeleteDir, 'delete_movie.csv')
+        with open(deleteCsvMovie, 'w', encoding='utf-8') as f:
             f.write('row_count,time_seconds\n')
-            for result in deleteResults:
+            for result in deleteResultsMovie:
+                f.write(f"{result['count']},{result['time']}\n")
+
+        deleteCsvViewer = os.path.join(operationsDeleteDir, 'delete_viewer.csv')
+        with open(deleteCsvViewer, 'w', encoding='utf-8') as f:
+            f.write('row_count,time_seconds\n')
+            for result in deleteResultsViewer:
+                f.write(f"{result['count']},{result['time']}\n")
+
+        deleteCsvViewerProfile = os.path.join(operationsDeleteDir, 'delete_viewer_profile.csv')
+        with open(deleteCsvViewerProfile, 'w', encoding='utf-8') as f:
+            f.write('row_count,time_seconds\n')
+            for result in deleteResultsViewerProfile:
                 f.write(f"{result['count']},{result['time']}\n")
 
         builder = PlotBuilder(operationsDeleteDir)
-        xValues = [r['count'] for r in deleteResults]
-        yValues = [r['time'] for r in deleteResults]
+        xValuesMovie = [r['count'] for r in deleteResultsMovie]
+        yValuesMovie = [r['time'] for r in deleteResultsMovie]
+        xValuesViewer = [r['count'] for r in deleteResultsViewer]
+        yValuesViewer = [r['time'] for r in deleteResultsViewer]
+        xValuesViewerProfile = [r['count'] for r in deleteResultsViewerProfile]
+        yValuesViewerProfile = [r['time'] for r in deleteResultsViewerProfile]
         builder.buildChart(
-            {'DELETE WHERE': (xValues, yValues)},
-            'DELETE WHERE операции',
+            {
+                'movie': (xValuesMovie, yValuesMovie),
+                'viewer': (xValuesViewer, yValuesViewer),
+                'viewer_profile': (xValuesViewerProfile, yValuesViewerProfile)
+            },
+            'DELETE WHERE операции (сравнение таблиц)',
             'Количество удаляемых строк',
             'Время выполнения (сек)',
-            'delete_operations',
+            'delete_operations_comparison',
             True
         )
 

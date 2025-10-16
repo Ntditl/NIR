@@ -1,7 +1,8 @@
 {
   "resultsDirectory": "benchmarkResults",
   "resultsSubdirectories": {
-    "generation": "point5b_generation",
+    "generationSingle": "point5b_1",
+    "generationFkGroups": "point5b_2",
     "operations": "point5c_operations",
     "pkIndex": "point6a_pk_index",
     "stringIndex": "point6b_string_index",

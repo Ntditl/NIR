@@ -1,7 +1,7 @@
 import os
-import timeit
 from lib.db.connection import getDbConnection
 from lib.visualization.plots import PlotBuilder
+from lib.utils.timing import measureExecutionTime
 import json
 
 SIZES = [1000, 3000, 6000, 10000]
@@ -60,12 +60,21 @@ def measureViewerPrimaryKeyPerformance():
             def runInsertNoPk():
                 resetViewerTablePair(cur)
                 insertViewerRows(cur, 'viewer_t2_nopk', rowCount)
-            insertTimeWithPk = min(timeit.repeat('runInsertWithPk()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            insertTimeNoPk = min(timeit.repeat('runInsertNoPk()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
+
+            timesWithPk = []
+            timesNoPk = []
+            for _ in range(REPEATS):
+                timesWithPk.append(measureExecutionTime(runInsertWithPk))
+                timesNoPk.append(measureExecutionTime(runInsertNoPk))
+
+            insertTimeWithPk = min(timesWithPk)
+            insertTimeNoPk = min(timesNoPk)
+
             resetViewerTablePair(cur)
             insertViewerRows(cur, 'viewer_t1_pk', rowCount)
             insertViewerRows(cur, 'viewer_t2_nopk', rowCount)
             targetId = rowCount // 2
+
             def runSelectEqWithPk():
                 runSql(cur, 'SELECT viewer_id FROM viewer_t1_pk WHERE viewer_id = ' + str(targetId))
             def runSelectEqNoPk():
@@ -74,10 +83,22 @@ def measureViewerPrimaryKeyPerformance():
                 runSql(cur, 'SELECT viewer_id FROM viewer_t1_pk WHERE viewer_id < ' + str(targetId))
             def runSelectLtNoPk():
                 runSql(cur, 'SELECT viewer_id FROM viewer_t2_nopk WHERE viewer_id < ' + str(targetId))
-            selectEqTimeWithPk = min(timeit.repeat('runSelectEqWithPk()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            selectEqTimeNoPk = min(timeit.repeat('runSelectEqNoPk()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            selectLtTimeWithPk = min(timeit.repeat('runSelectLtWithPk()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            selectLtTimeNoPk = min(timeit.repeat('runSelectLtNoPk()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
+
+            selectEqWithPkTimes = []
+            selectEqNoPkTimes = []
+            selectLtWithPkTimes = []
+            selectLtNoPkTimes = []
+            for _ in range(REPEATS):
+                selectEqWithPkTimes.append(measureExecutionTime(runSelectEqWithPk))
+                selectEqNoPkTimes.append(measureExecutionTime(runSelectEqNoPk))
+                selectLtWithPkTimes.append(measureExecutionTime(runSelectLtWithPk))
+                selectLtNoPkTimes.append(measureExecutionTime(runSelectLtNoPk))
+
+            selectEqTimeWithPk = min(selectEqWithPkTimes)
+            selectEqTimeNoPk = min(selectEqNoPkTimes)
+            selectLtTimeWithPk = min(selectLtWithPkTimes)
+            selectLtTimeNoPk = min(selectLtNoPkTimes)
+
             selectEqTimesWithPk.append((rowCount, selectEqTimeWithPk))
             selectEqTimesNoPk.append((rowCount, selectEqTimeNoPk))
             selectLtTimesWithPk.append((rowCount, selectLtTimeWithPk))
@@ -133,13 +154,22 @@ def measureMovieTitleIndexPerformance():
             def runInsertNoIndex():
                 resetMovieTitleIndexPair(cur)
                 insertMovieTitleRows(cur, 'movie_t4_no_idx', rowCount)
-            insertTimeWithIndex = min(timeit.repeat('runInsertWithIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            insertTimeNoIndex = min(timeit.repeat('runInsertNoIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
+
+            insertWithIndexTimes = []
+            insertNoIndexTimes = []
+            for _ in range(REPEATS):
+                insertWithIndexTimes.append(measureExecutionTime(runInsertWithIndex))
+                insertNoIndexTimes.append(measureExecutionTime(runInsertNoIndex))
+
+            insertTimeWithIndex = min(insertWithIndexTimes)
+            insertTimeNoIndex = min(insertNoIndexTimes)
+
             resetMovieTitleIndexPair(cur)
             insertMovieTitleRows(cur, 'movie_t3_idx', rowCount)
             insertMovieTitleRows(cur, 'movie_t4_no_idx', rowCount)
             targetId = rowCount // 2
             targetTitle = TITLE_PREFIX + str(targetId)
+
             def runSelectEqWithIndex():
                 runSql(cur, "SELECT movie_id FROM movie_t3_idx WHERE title = '" + targetTitle + "'")
             def runSelectEqNoIndex():
@@ -152,12 +182,28 @@ def measureMovieTitleIndexPerformance():
                 runSql(cur, "SELECT movie_id FROM movie_t3_idx WHERE title LIKE '%" + SUBSTRING_MATCH + "%'")
             def runSelectSubstringNoIndex():
                 runSql(cur, "SELECT movie_id FROM movie_t4_no_idx WHERE title LIKE '%" + SUBSTRING_MATCH + "%'")
-            selectEqTimeWithIndex = min(timeit.repeat('runSelectEqWithIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            selectEqTimeNoIndex = min(timeit.repeat('runSelectEqNoIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            selectPrefixTimeWithIndex = min(timeit.repeat('runSelectPrefixWithIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            selectPrefixTimeNoIndex = min(timeit.repeat('runSelectPrefixNoIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            selectSubstringTimeWithIndex = min(timeit.repeat('runSelectSubstringWithIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            selectSubstringTimeNoIndex = min(timeit.repeat('runSelectSubstringNoIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
+
+            selectEqWithIndexTimes = []
+            selectEqNoIndexTimes = []
+            selectPrefixWithIndexTimes = []
+            selectPrefixNoIndexTimes = []
+            selectSubstringWithIndexTimes = []
+            selectSubstringNoIndexTimes = []
+            for _ in range(REPEATS):
+                selectEqWithIndexTimes.append(measureExecutionTime(runSelectEqWithIndex))
+                selectEqNoIndexTimes.append(measureExecutionTime(runSelectEqNoIndex))
+                selectPrefixWithIndexTimes.append(measureExecutionTime(runSelectPrefixWithIndex))
+                selectPrefixNoIndexTimes.append(measureExecutionTime(runSelectPrefixNoIndex))
+                selectSubstringWithIndexTimes.append(measureExecutionTime(runSelectSubstringWithIndex))
+                selectSubstringNoIndexTimes.append(measureExecutionTime(runSelectSubstringNoIndex))
+
+            selectEqTimeWithIndex = min(selectEqWithIndexTimes)
+            selectEqTimeNoIndex = min(selectEqNoIndexTimes)
+            selectPrefixTimeWithIndex = min(selectPrefixWithIndexTimes)
+            selectPrefixTimeNoIndex = min(selectPrefixNoIndexTimes)
+            selectSubstringTimeWithIndex = min(selectSubstringWithIndexTimes)
+            selectSubstringTimeNoIndex = min(selectSubstringNoIndexTimes)
+
             selectEqTimesWithIndex.append((rowCount, selectEqTimeWithIndex))
             selectEqTimesNoIndex.append((rowCount, selectEqTimeNoIndex))
             selectPrefixTimesWithIndex.append((rowCount, selectPrefixTimeWithIndex))
@@ -216,11 +262,20 @@ def measureMovieFullTextPerformance():
             def runInsertNoFtsIndex():
                 resetMovieFullTextPair(cur)
                 insertMovieFullTextRows(cur, 'movie_ft_t6_no_idx', rowCount)
-            insertTimeWithIndex = min(timeit.repeat('runInsertWithFtsIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            insertTimeNoIndex = min(timeit.repeat('runInsertNoFtsIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
+
+            insertWithIndexTimes = []
+            insertNoIndexTimes = []
+            for _ in range(REPEATS):
+                insertWithIndexTimes.append(measureExecutionTime(runInsertWithFtsIndex))
+                insertNoIndexTimes.append(measureExecutionTime(runInsertNoFtsIndex))
+
+            insertTimeWithIndex = min(insertWithIndexTimes)
+            insertTimeNoIndex = min(insertNoIndexTimes)
+
             resetMovieFullTextPair(cur)
             insertMovieFullTextRows(cur, 'movie_ft_t5', rowCount)
             insertMovieFullTextRows(cur, 'movie_ft_t6_no_idx', rowCount)
+
             def runFtsOneWordWithIndex():
                 runSql(cur, "SELECT movie_id FROM movie_ft_t5 WHERE search_tsv @@ plainto_tsquery('english','" + FTS_WORD_ONE + "')")
             def runFtsOneWordNoIndex():
@@ -229,10 +284,22 @@ def measureMovieFullTextPerformance():
                 runSql(cur, "SELECT movie_id FROM movie_ft_t5 WHERE search_tsv @@ plainto_tsquery('english','" + FTS_WORD_TWO + "')")
             def runFtsTwoWordsNoIndex():
                 runSql(cur, "SELECT movie_id FROM movie_ft_t6_no_idx WHERE search_tsv @@ plainto_tsquery('english','" + FTS_WORD_TWO + "')")
-            ftsOneWordTimeWithIndex = min(timeit.repeat('runFtsOneWordWithIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            ftsOneWordTimeNoIndex = min(timeit.repeat('runFtsOneWordNoIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            ftsTwoWordsTimeWithIndex = min(timeit.repeat('runFtsTwoWordsWithIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
-            ftsTwoWordsTimeNoIndex = min(timeit.repeat('runFtsTwoWordsNoIndex()', repeat=REPEATS, number=REPEAT_NUMBER, globals=locals()))
+
+            ftsOneWordWithIndexTimes = []
+            ftsOneWordNoIndexTimes = []
+            ftsTwoWordsWithIndexTimes = []
+            ftsTwoWordsNoIndexTimes = []
+            for _ in range(REPEATS):
+                ftsOneWordWithIndexTimes.append(measureExecutionTime(runFtsOneWordWithIndex))
+                ftsOneWordNoIndexTimes.append(measureExecutionTime(runFtsOneWordNoIndex))
+                ftsTwoWordsWithIndexTimes.append(measureExecutionTime(runFtsTwoWordsWithIndex))
+                ftsTwoWordsNoIndexTimes.append(measureExecutionTime(runFtsTwoWordsNoIndex))
+
+            ftsOneWordTimeWithIndex = min(ftsOneWordWithIndexTimes)
+            ftsOneWordTimeNoIndex = min(ftsOneWordNoIndexTimes)
+            ftsTwoWordsTimeWithIndex = min(ftsTwoWordsWithIndexTimes)
+            ftsTwoWordsTimeNoIndex = min(ftsTwoWordsNoIndexTimes)
+
             insertTimesWithIndex.append((rowCount, insertTimeWithIndex))
             insertTimesNoIndex.append((rowCount, insertTimeNoIndex))
             ftsOneWordTimesWithIndex.append((rowCount, ftsOneWordTimeWithIndex))
@@ -266,15 +333,26 @@ def measureGenericIndexSet(configList, outDir):
                 whereParts.append(c + ' = %s')
             sampleSql = 'SELECT COUNT(*) FROM ' + table + ' WHERE ' + ' AND '.join(whereParts)
             params = [None] * len(columns)
+
             def runNo():
                 cur.execute(sampleSql, params)
                 cur.fetchone()
             def runWith():
                 cur.execute(sampleSql, params)
                 cur.fetchone()
-            tNo = min(timeit.Timer(runNo).repeat(repeat=REPEATS, number=1))
+
+            tNoTimes = []
+            for _ in range(REPEATS):
+                tNoTimes.append(measureExecutionTime(runNo))
+            tNo = min(tNoTimes)
+
             cur.execute('CREATE INDEX ' + idxName + ' ON ' + table + ' USING ' + indexType + ' (' + ', '.join(columns) + ')')
-            tWith = min(timeit.Timer(runWith).repeat(repeat=REPEATS, number=1))
+
+            tWithTimes = []
+            for _ in range(REPEATS):
+                tWithTimes.append(measureExecutionTime(runWith))
+            tWith = min(tWithTimes)
+
             cur.execute('DROP INDEX IF EXISTS ' + idxName)
             rows.append((table, columns, indexType, tNo, tWith))
             names.append(idxName)

@@ -1,7 +1,6 @@
 import os
 import random
 import sys
-import timeit
 from decimal import Decimal
 from datetime import datetime, timezone
 from lib.db.connection import getDbConnection
@@ -9,6 +8,7 @@ from lib.db.models import getCreateTablesSql, getTableNames
 from lib.data.generators import RandomDataGenerator
 from lib.visualization.plots import PlotBuilder
 from lib.managers.sandboxManager import SandboxManager
+from lib.utils.timing import measureExecutionTime, measureAverageTime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -24,17 +24,6 @@ def medianValue(values):
     if valueLength % 2 == 1:
         return sortedArray[middleIndex]
     return (sortedArray[middleIndex - 1] + sortedArray[middleIndex]) / 2.0
-
-def measureExecutionTime(func):
-    executionTime = timeit.timeit(func, number=1)
-    result = func()
-    return executionTime, result
-
-def measureAverageTime(func, repeats=3):
-    times = timeit.repeat(func, repeat=repeats, number=1)
-    avgTime = sum(times) / len(times)
-    result = func()
-    return avgTime, result
 
 def buildSeriesDict(results):
     seriesDict = {}

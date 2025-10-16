@@ -1,9 +1,9 @@
 import datetime
 import random
-import timeit
 import os
 from lib.db.connection import getDbConnection
 from lib.visualization.plots import PlotBuilder
+from lib.utils.timing import measureExecutionTime
 
 REPEATS = 3
 FAST_THRESHOLD = 0.01
@@ -66,36 +66,34 @@ def _generateTableRows(tableName, rowCount):
 
 def _generateRelatedGroup(tablesSequence, rowCount):
     generated = {}
-    for t in tablesSequence:
-        if t == 'viewer_profile':
-            generated['viewer'] = _generateTableRows('viewer', rowCount)
-            generated['viewer_profile'] = _generateTableRows('viewer_profile', rowCount)
-        elif t == 'favorite_movies':
-            generated['viewer'] = _generateTableRows('viewer', rowCount)
-            generated['movie'] = _generateTableRows('movie', rowCount)
-            generated['favorite_movies'] = _generateTableRows('favorite_movies', rowCount)
+    for tableName in tablesSequence:
+        generated[tableName] = _generateTableRows(tableName, rowCount)
     return generated
 
 
 def _measureGenerateSingle(table, n):
     def run():
         _generateTableRows(table, n)
-    arr = timeit.repeat('run()', repeat=REPEATS, number=1, globals=locals())
+    times = []
+    for _ in range(REPEATS):
+        times.append(measureExecutionTime(run))
     total = 0.0
-    for v in arr:
+    for v in times:
         total = total + v
-    avg = total / len(arr)
+    avg = total / len(times)
     return avg
 
 
 def _measureGenerateGroup(sequence, n):
     def run():
         _generateRelatedGroup(sequence, n)
-    arr = timeit.repeat('run()', repeat=REPEATS, number=1, globals=locals())
+    times = []
+    for _ in range(REPEATS):
+        times.append(measureExecutionTime(run))
     total = 0.0
-    for v in arr:
+    for v in times:
         total = total + v
-    avg = total / len(arr)
+    avg = total / len(times)
     return avg
 
 
@@ -161,8 +159,8 @@ def _writeCategoriesCsv(path, fast, medium, slow):
 
 def measureGenerationSpeed(
     tablesConfig,
-    outputCsvPath,
-    outputImagePath=None
+    outputSingleDir,
+    outputFkGroupsDir
 ):
     selectedTables = []
     if isinstance(tablesConfig, dict):
@@ -205,52 +203,42 @@ def measureGenerationSpeed(
         resultsGroups[name] = times
         print('Группа', name, 'завершена', flush=True)
 
-    outDir = os.path.dirname(outputCsvPath)
-    if outDir != "" and not os.path.isdir(outDir):
-        os.makedirs(outDir, exist_ok=True)
-    with open(outputCsvPath, 'w', newline='', encoding='utf-8') as csvf:
-        csvf.write('subject,type,rows,time_seconds\n')
-        for table in resultsSingle:
-            series = resultsSingle[table]
-            for point in series:
-                csvf.write(f"{table},single,{point[0]},{point[1]:.6f}\n")
-        for group in resultsGroups:
-            series = resultsGroups[group]
-            for point in series:
-                csvf.write(f"{group},fk_group,{point[0]},{point[1]:.6f}\n")
+    if not os.path.isdir(outputSingleDir):
+        os.makedirs(outputSingleDir, exist_ok=True)
+    if not os.path.isdir(outputFkGroupsDir):
+        os.makedirs(outputFkGroupsDir, exist_ok=True)
 
-    if outputImagePath:
-        outDir = os.path.dirname(outputImagePath)
-        if outDir != "" and not os.path.isdir(outDir):
-            os.makedirs(outDir, exist_ok=True)
-        isRaster = False
-        ext = os.path.splitext(outputImagePath)[1].lower()
-        if ext in ['.png', '.jpg', '.jpeg']:
-            isRaster = True
-        # индивидуальные графики отключены
-        combined = {}
+    singleCsvPath = os.path.join(outputSingleDir, 'generation_speed_single.csv')
+    with open(singleCsvPath, 'w', newline='', encoding='utf-8') as csvf:
+        csvf.write('table,rows,time_seconds\n')
         for table in resultsSingle:
             series = resultsSingle[table]
-            xs = []
-            ys = []
             for point in series:
-                xs.append(point[0])
-                ys.append(point[1])
-            combined[table] = (xs, ys)
+                csvf.write(f"{table},{point[0]},{point[1]:.6f}\n")
+
+    fkGroupsCsvPath = os.path.join(outputFkGroupsDir, 'generation_speed_fk_groups.csv')
+    with open(fkGroupsCsvPath, 'w', newline='', encoding='utf-8') as csvf:
+        csvf.write('group,rows,time_seconds\n')
         for group in resultsGroups:
             series = resultsGroups[group]
-            xs = []
-            ys = []
             for point in series:
-                xs.append(point[0])
-                ys.append(point[1])
-            combined[group] = (xs, ys)
-        allSeries = {}
-        for k in resultsSingle:
-            allSeries[k] = resultsSingle[k]
+                csvf.write(f"{group},{point[0]},{point[1]:.6f}\n")
+
+    singleImagePath = os.path.join(outputSingleDir, 'generation_speed_single.png')
+    allSingleSeries = {}
+    for k in resultsSingle:
+        allSingleSeries[k] = resultsSingle[k]
+    fast, medium, slow = _categorizeSeries(allSingleSeries)
+    _saveCategoryCombined((fast, medium, slow), outputSingleDir, True)
+    categoriesCsvPath = os.path.join(outputSingleDir, CATEGORIES_CSV_NAME)
+    _writeCategoriesCsv(categoriesCsvPath, fast, medium, slow)
+
+    fkGroupsImagePath = os.path.join(outputFkGroupsDir, 'generation_speed_fk_groups.png')
+    if len(resultsGroups) > 0:
+        allFkSeries = {}
         for k in resultsGroups:
-            allSeries[k] = resultsGroups[k]
-        fast, medium, slow = _categorizeSeries(allSeries)
-        _saveCategoryCombined((fast, medium, slow), outDir, isRaster)
-        categoriesCsvPath = os.path.join(outDir, CATEGORIES_CSV_NAME)
+            allFkSeries[k] = resultsGroups[k]
+        fast, medium, slow = _categorizeSeries(allFkSeries)
+        _saveCategoryCombined((fast, medium, slow), outputFkGroupsDir, True)
+        categoriesCsvPath = os.path.join(outputFkGroupsDir, CATEGORIES_CSV_NAME)
         _writeCategoriesCsv(categoriesCsvPath, fast, medium, slow)

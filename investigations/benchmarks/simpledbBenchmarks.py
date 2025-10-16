@@ -1,11 +1,11 @@
 import os
 import shutil
 import random
-import time
 from lib.simpledb.schema import Schema
 from lib.simpledb.paths import TableFiles
 from lib.simpledb.engine.table_engine import TableEngine
 from lib.visualization.plots import PlotBuilder
+from lib.utils.timing import measureExecutionTime
 
 RANDOM_SEED_NUMBER = 12345
 RANDOM_SEED_STRING = 43210
@@ -69,36 +69,45 @@ def measureSelectPerformance(engine, dataType, withIndex, rowCount, queriesPerRu
     if dataType == 'number':
         for _ in range(queriesPerRun):
             targetId = random.randint(1, rowCount)
-            startTime = time.perf_counter()
-            results = engine.select(['*'], ('id', targetId))
-            endTime = time.perf_counter()
-            totalTime += (endTime - startTime)
+
+            def executeQuery():
+                results = engine.select(['*'], ('id', targetId))
+                return results
+
+            queryTime = measureExecutionTime(executeQuery)
+            totalTime += queryTime
     else:
         names = ["Alice", "Bob", "Charlie", "Diana", "Edward", "Fiona", "George", "Helen"]
         for _ in range(queriesPerRun):
             targetName = random.choice(names) + str(random.randint(1, rowCount) % 100)
-            startTime = time.perf_counter()
-            results = engine.select(['*'], ('name', targetName))
-            endTime = time.perf_counter()
-            totalTime += (endTime - startTime)
+
+            def executeQuery():
+                results = engine.select(['*'], ('name', targetName))
+                return results
+
+            queryTime = measureExecutionTime(executeQuery)
+            totalTime += queryTime
 
     return totalTime / queriesPerRun
 
 def measureInsertPerformance(engine, dataType, insertCount):
     if dataType == 'number':
-        startTime = time.perf_counter()
-        for i in range(insertCount):
-            engine.insertRow({"id": 10000 + i, "val": random.randint(0, 1000000)})
-        endTime = time.perf_counter()
+        def executeInserts():
+            for i in range(insertCount):
+                engine.insertRow({"id": 10000 + i, "val": random.randint(0, 1000000)})
+
+        insertTime = measureExecutionTime(executeInserts)
     else:
         names = ["Alice", "Bob", "Charlie", "Diana", "Edward", "Fiona", "George", "Helen"]
-        startTime = time.perf_counter()
-        for i in range(insertCount):
-            name = random.choice(names) + str(10000 + i)
-            engine.insertRow({"id": 10000 + i, "name": name})
-        endTime = time.perf_counter()
 
-    return endTime - startTime
+        def executeInserts():
+            for i in range(insertCount):
+                name = random.choice(names) + str(10000 + i)
+                engine.insertRow({"id": 10000 + i, "name": name})
+
+        insertTime = measureExecutionTime(executeInserts)
+
+    return insertTime
 
 def measureDeletePerformance(engine, dataType, rowCount, queriesPerRun):
     totalTime = 0
@@ -106,18 +115,22 @@ def measureDeletePerformance(engine, dataType, rowCount, queriesPerRun):
     if dataType == 'number':
         for _ in range(queriesPerRun):
             targetId = random.randint(1, rowCount)
-            startTime = time.perf_counter()
-            engine.deleteWhere("id", targetId)
-            endTime = time.perf_counter()
-            totalTime += (endTime - startTime)
+
+            def executeDelete():
+                engine.deleteWhere("id", targetId)
+
+            deleteTime = measureExecutionTime(executeDelete)
+            totalTime += deleteTime
     else:
         names = ["Alice", "Bob", "Charlie", "Diana", "Edward", "Fiona", "George", "Helen"]
         for _ in range(queriesPerRun):
             targetName = random.choice(names) + str(random.randint(1, rowCount) % 100)
-            startTime = time.perf_counter()
-            engine.deleteWhere("name", targetName)
-            endTime = time.perf_counter()
-            totalTime += (endTime - startTime)
+
+            def executeDelete():
+                engine.deleteWhere("name", targetName)
+
+            deleteTime = measureExecutionTime(executeDelete)
+            totalTime += deleteTime
 
     return totalTime / queriesPerRun
 

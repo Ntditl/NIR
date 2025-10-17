@@ -147,11 +147,12 @@ class SandboxManager:
             cur.execute("SELECT COUNT(*) FROM " + self.sandboxSchemaName + ".viewer")
             viewerCount = cur.fetchone()[0]
 
-        if viewerCount < 10:
-            print(f"В таблице viewer только {viewerCount} записей, генерируем минимальный набор данных...", flush=True)
+        minRequiredRows = 3000
+        if viewerCount < minRequiredRows:
+            print(f"В таблице viewer только {viewerCount} записей, генерируем данные до {minRequiredRows}...", flush=True)
             dataGenerator = RandomDataGenerator()
             dataGenerator.setSchemaPrefix(self.sandboxSchemaName + ".")
-            dataGenerator.generateMinimalDataset(10, 10, 10, 15)
+            dataGenerator.generateMinimalDataset(minRequiredRows, minRequiredRows, minRequiredRows, minRequiredRows * 2)
         else:
             print(f"В таблице viewer уже {viewerCount} записей, генерация не требуется", flush=True)
 

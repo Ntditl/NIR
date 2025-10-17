@@ -28,6 +28,16 @@ def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, di
     stringIndexRowCounts = indexResearchConfig['stringIndexRowCounts']
     ftsRowCounts = indexResearchConfig['ftsRowCounts']
 
+    try:
+        pkRuns = indexResearchConfig['pkRuns']
+        pkQueriesPerRun = indexResearchConfig['pkQueriesPerRun']
+        stringQueriesPerRun = indexResearchConfig['stringQueriesPerRun']
+        ftsSampleQueries = indexResearchConfig['ftsSampleQueries']
+        ftsMultiSampleQueries = indexResearchConfig['ftsMultiSampleQueries']
+    except KeyError as exc:
+        missingKey = str(exc).strip("\'")
+        raise ValueError("В конфигурации 'paramsSettings.json' отсутствует ключ indexResearch.%s. Добавьте параметр в файл настроек." % missingKey)
+
     simpleDbConfig = config['simpleDb']
     simpleDbRowCounts = simpleDbConfig['rowCounts']
     simpleDbRepeats = simpleDbConfig['repeats']
@@ -367,212 +377,22 @@ def runBenchmarks(configPath: str, disablePk: bool, disableStringIndex: bool, di
 
         if not disablePk:
             print('=== ИССЛЕДОВАНИЯ ПЕРВИЧНЫХ КЛЮЧЕЙ (ПУНКТ 6.a) ===', flush=True)
-            pkResults = measurePkIndexEffect(pkRowCounts, pkSelectEqualityDir, True)
-            pkIneqResults = measurePkInequalityEffect(pkRowCounts, pkSelectInequalityDir, True)
-            pkInsertResults = measurePkInsertEffect(pkRowCounts, pkInsertDir, True)
-
-            pkCsv = os.path.join(pkSelectEqualityDir, 'pk_index_effect.csv')
-            with open(pkCsv, 'w', encoding='utf-8') as f:
-                f.write('row_count,time_seconds\n')
-                for result in pkResults:
-                    f.write(f"{result['count']},{result['time']}\n")
-
-            pkPlot = 'pk_index_effect'
-            builder = PlotBuilder(pkSelectEqualityDir)
-            xValues = [r['count'] for r in pkResults]
-            yValues = [r['time'] for r in pkResults]
-            builder.buildChart(
-                {'PK индекс': (xValues, yValues)},
-                'Эффект индекса первичного ключа на SELECT',
-                'Количество строк',
-                'Время выполнения (сек)',
-                pkPlot,
-                True
-            )
-
-            pkIneqCsv = os.path.join(pkSelectInequalityDir, 'pk_inequality_effect.csv')
-            with open(pkIneqCsv, 'w', encoding='utf-8') as f:
-                f.write('row_count,time_seconds\n')
-                for result in pkIneqResults:
-                    f.write(f"{result['count']},{result['time']}\n")
-
-            pkIneqPlot = 'pk_inequality_effect'
-            builder = PlotBuilder(pkSelectInequalityDir)
-            xValues = [r['count'] for r in pkIneqResults]
-            yValues = [r['time'] for r in pkIneqResults]
-            builder.buildChart(
-                {'PK неравенства': (xValues, yValues)},
-                'PK индекс с неравенствами (< >)',
-                'Количество строк',
-                'Время выполнения (сек)',
-                pkIneqPlot,
-                True
-            )
-
-            pkInsertCsv = os.path.join(pkInsertDir, 'pk_insert_effect.csv')
-            with open(pkInsertCsv, 'w', encoding='utf-8') as f:
-                f.write('row_count,time_seconds\n')
-                for result in pkInsertResults:
-                    f.write(f"{result['count']},{result['time']}\n")
-
-            pkInsertPlot = 'pk_insert_effect'
-            builder = PlotBuilder(pkInsertDir)
-            xValues = [r['count'] for r in pkInsertResults]
-            yValues = [r['time'] for r in pkInsertResults]
-            builder.buildChart(
-                {'INSERT с PK': (xValues, yValues)},
-                'Влияние PK на INSERT операции',
-                'Количество строк',
-                'Время выполнения (сек)',
-                pkInsertPlot,
-                True
-            )
+            pkResults = measurePkIndexEffect(pkRowCounts, pkSelectEqualityDir, True, pkRuns, pkQueriesPerRun)
+            pkIneqResults = measurePkInequalityEffect(pkRowCounts, pkSelectInequalityDir, True, pkRuns, pkQueriesPerRun)
+            pkInsertResults = measurePkInsertEffect(pkRowCounts, pkInsertDir, True, pkRuns, pkQueriesPerRun)
 
         if not disableStringIndex:
             print('=== ИССЛЕДОВАНИЯ СТРОКОВЫХ ИНДЕКСОВ (ПУНКТ 6.b) ===', flush=True)
-            stringIdxResults = measureStringIndexExperiment(stringIndexRowCounts, stringSelectExactDir, True)
-            stringPrefixResults = measureStringLikePrefix(stringIndexRowCounts, stringSelectLikePrefixDir, True)
-            stringContainsResults = measureStringLikeContains(stringIndexRowCounts, stringSelectLikeContainsDir, True)
-            stringInsertResults = measureStringInsertExperiment(stringIndexRowCounts, stringInsertDir, True)
-
-            stringIdxCsv = os.path.join(stringSelectExactDir, 'string_index_experiment.csv')
-            with open(stringIdxCsv, 'w', encoding='utf-8') as f:
-                f.write('row_count,time_seconds\n')
-                for result in stringIdxResults:
-                    f.write(f"{result['count']},{result['time']}\n")
-
-            stringIdxPlot = 'string_index_experiment'
-            builder = PlotBuilder(stringSelectExactDir)
-            xValues = [r['count'] for r in stringIdxResults]
-            yValues = [r['time'] for r in stringIdxResults]
-            builder.buildChart(
-                {'Строковый индекс': (xValues, yValues)},
-                'Строковый индекс: SELECT с точным совпадением',
-                'Количество строк',
-                'Время выполнения (сек)',
-                stringIdxPlot,
-                True
-            )
-
-            stringPrefixCsv = os.path.join(stringSelectLikePrefixDir, 'string_like_prefix.csv')
-            with open(stringPrefixCsv, 'w', encoding='utf-8') as f:
-                f.write('row_count,time_seconds\n')
-                for result in stringPrefixResults:
-                    f.write(f"{result['count']},{result['time']}\n")
-
-            stringPrefixPlot = 'string_like_prefix'
-            builder = PlotBuilder(stringSelectLikePrefixDir)
-            xValues = [r['count'] for r in stringPrefixResults]
-            yValues = [r['time'] for r in stringPrefixResults]
-            builder.buildChart(
-                {'LIKE prefix%': (xValues, yValues)},
-                'LIKE с префиксом (prefix%)',
-                'Количество строк',
-                'Время выполнения (сек)',
-                stringPrefixPlot,
-                True
-            )
-
-            stringContainsCsv = os.path.join(stringSelectLikeContainsDir, 'string_like_contains.csv')
-            with open(stringContainsCsv, 'w', encoding='utf-8') as f:
-                f.write('row_count,time_seconds\n')
-                for result in stringContainsResults:
-                    f.write(f"{result['count']},{result['time']}\n")
-
-            stringContainsPlot = 'string_like_contains'
-            builder = PlotBuilder(stringSelectLikeContainsDir)
-            xValues = [r['count'] for r in stringContainsResults]
-            yValues = [r['time'] for r in stringContainsResults]
-            builder.buildChart(
-                {'LIKE %substring%': (xValues, yValues)},
-                'LIKE с подстрокой (%substring%)',
-                'Количество строк',
-                'Время выполнения (сек)',
-                stringContainsPlot,
-                True
-            )
-
-            stringInsertCsv = os.path.join(stringInsertDir, 'string_insert_experiment.csv')
-            with open(stringInsertCsv, 'w', encoding='utf-8') as f:
-                f.write('row_count,time_seconds\n')
-                for result in stringInsertResults:
-                    f.write(f"{result['count']},{result['time']}\n")
-
-            stringInsertPlot = 'string_insert_experiment'
-            builder = PlotBuilder(stringInsertDir)
-            xValues = [r['count'] for r in stringInsertResults]
-            yValues = [r['time'] for r in stringInsertResults]
-            builder.buildChart(
-                {'INSERT со строковым индексом': (xValues, yValues)},
-                'INSERT со строковым индексом',
-                'Количество строк',
-                'Время выполнения (сек)',
-                stringInsertPlot,
-                True
-            )
+            stringIdxResults = measureStringIndexExperiment(stringIndexRowCounts, stringSelectExactDir, True, pkRuns, stringQueriesPerRun)
+            stringPrefixResults = measureStringLikePrefix(stringIndexRowCounts, stringSelectLikePrefixDir, True, pkRuns, stringQueriesPerRun)
+            stringContainsResults = measureStringLikeContains(stringIndexRowCounts, stringSelectLikeContainsDir, True, pkRuns, stringQueriesPerRun)
+            stringInsertResults = measureStringInsertExperiment(stringIndexRowCounts, stringInsertDir, True, pkRuns, stringQueriesPerRun)
 
         if not disableFts:
             print('=== ИССЛЕДОВАНИЯ ПОЛНОТЕКСТОВЫХ ИНДЕКСОВ (ПУНКТ 6.c) ===', flush=True)
-            ftsSingleResults = measureFtsSingleWordExperiment(ftsRowCounts, ftsSelectSingleWordDir, True)
-            ftsMultiResults = measureFtsMultiWordExperiment(ftsRowCounts, ftsSelectMultiWordDir, True)
-            ftsInsertResults = measureFtsInsertExperiment(ftsRowCounts, ftsInsertDir, True)
-
-            ftsSingleCsv = os.path.join(ftsSelectSingleWordDir, 'fts_single_word.csv')
-            with open(ftsSingleCsv, 'w', encoding='utf-8') as f:
-                f.write('row_count,time_seconds\n')
-                for result in ftsSingleResults:
-                    f.write(f"{result['count']},{result['time']}\n")
-
-            ftsSinglePlot = 'fts_single_word'
-            builder = PlotBuilder(ftsSelectSingleWordDir)
-            xValues = [r['count'] for r in ftsSingleResults]
-            yValues = [r['time'] for r in ftsSingleResults]
-            builder.buildChart(
-                {'FTS одно слово': (xValues, yValues)},
-                'Полнотекстовый поиск: одно слово',
-                'Количество строк',
-                'Время выполнения (сек)',
-                ftsSinglePlot,
-                True
-            )
-
-            ftsMultiCsv = os.path.join(ftsSelectMultiWordDir, 'fts_multi_word.csv')
-            with open(ftsMultiCsv, 'w', encoding='utf-8') as f:
-                f.write('row_count,time_seconds\n')
-                for result in ftsMultiResults:
-                    f.write(f"{result['count']},{result['time']}\n")
-
-            ftsMultiPlot = 'fts_multi_word'
-            builder = PlotBuilder(ftsSelectMultiWordDir)
-            xValues = [r['count'] for r in ftsMultiResults]
-            yValues = [r['time'] for r in ftsMultiResults]
-            builder.buildChart(
-                {'FTS несколько слов': (xValues, yValues)},
-                'Полнотекстовый поиск: несколько слов',
-                'Количество строк',
-                'Время выполнения (сек)',
-                ftsMultiPlot,
-                True
-            )
-
-            ftsInsertCsv = os.path.join(ftsInsertDir, 'fts_insert_experiment.csv')
-            with open(ftsInsertCsv, 'w', encoding='utf-8') as f:
-                f.write('row_count,time_seconds\n')
-                for result in ftsInsertResults:
-                    f.write(f"{result['count']},{result['time']}\n")
-
-            ftsInsertPlot = 'fts_insert_experiment'
-            builder = PlotBuilder(ftsInsertDir)
-            xValues = [r['count'] for r in ftsInsertResults]
-            yValues = [r['time'] for r in ftsInsertResults]
-            builder.buildChart(
-                {'INSERT с FTS': (xValues, yValues)},
-                'INSERT с полнотекстовым индексом',
-                'Количество строк',
-                'Время выполнения (сек)',
-                ftsInsertPlot,
-                True
-            )
+            ftsSingleResults = measureFtsSingleWordExperiment(ftsRowCounts, ftsSelectSingleWordDir, True, pkRuns, ftsSampleQueries)
+            ftsMultiResults = measureFtsMultiWordExperiment(ftsRowCounts, ftsSelectMultiWordDir, True, pkRuns, ftsMultiSampleQueries)
+            ftsInsertResults = measureFtsInsertExperiment(ftsRowCounts, ftsInsertDir, True, pkRuns, ftsSampleQueries)
     finally:
         print('Очистка песочницы после исследований', flush=True)
         sandboxManager.dropSandboxSchema()

@@ -11,8 +11,6 @@ from lib.visualization.plots import PlotBuilder
 from lib.utils.timing import measureAverageTime
 from investigations.researchUtils import SANDBOX_SCHEMA_NAME
 
-RUNS = 1
-QUERIES_PER_RUN = 10
 
 
 def _createTableCopyWithoutPk(sourceTable, targetTable):
@@ -78,7 +76,7 @@ def _fillTableWithData(tableName, rowCount):
     print(f"Таблица {tableName} заполнена {rowCount} строками", flush=True)
 
 
-def measurePkIndexEffect(rowCounts, resultsDir, savePlot):
+def measurePkIndexEffect(rowCounts, resultsDir, savePlot, runs=1, queriesPerRun=10):
     tableWithPk = 'movie'
     tableNoPk = 'movie_no_pk'
 
@@ -99,15 +97,15 @@ def measurePkIndexEffect(rowCounts, resultsDir, savePlot):
         totalTimeWithPk = 0.0
         totalTimeNoPk = 0.0
 
-        totalQueries = RUNS * QUERIES_PER_RUN
-        print(f'  Выполняем {totalQueries} запросов ({RUNS} раундов по {QUERIES_PER_RUN} запросов)...', flush=True)
+        totalQueries = runs * queriesPerRun
+        print(f'  Выполняем {totalQueries} запросов ({runs} раундов по {queriesPerRun} запросов)...', flush=True)
 
-        for runIndex in range(RUNS):
-            print(f'  Раунд {runIndex + 1}/{RUNS}...', flush=True)
+        for runIndex in range(runs):
+            print(f'  Раунд {runIndex + 1}/{runs}...', flush=True)
 
-            for queryIndex in range(QUERIES_PER_RUN):
+            for queryIndex in range(queriesPerRun):
                 if queryIndex % 20 == 0:
-                    print(f'    [LOG] запрос {queryIndex + 1}/{QUERIES_PER_RUN}', flush=True)
+                    print(f'    [LOG] запрос {queryIndex + 1}/{queriesPerRun}', flush=True)
 
                 def queryWithPk():
                     searchId = random.randint(1, rowCount)
@@ -158,7 +156,7 @@ def measurePkIndexEffect(rowCounts, resultsDir, savePlot):
     return resultsWithPk
 
 
-def measurePkInequalityEffect(rowCounts, resultsDir, savePlot):
+def measurePkInequalityEffect(rowCounts, resultsDir, savePlot, runs=1, queriesPerRun=10):
     tableWithPk = 'movie'
     tableNoPk = 'movie_no_pk'
 
@@ -174,8 +172,8 @@ def measurePkInequalityEffect(rowCounts, resultsDir, savePlot):
         totalTimeWithPk = 0.0
         totalTimeNoPk = 0.0
 
-        for runIndex in range(RUNS):
-            for queryIndex in range(QUERIES_PER_RUN):
+        for runIndex in range(runs):
+            for queryIndex in range(queriesPerRun):
                 threshold = random.randint(1, rowCount)
 
                 def queryWithPk():
@@ -194,8 +192,8 @@ def measurePkInequalityEffect(rowCounts, resultsDir, savePlot):
                 timeNoPk = measureAverageTime(queryNoPk, repeats=1)
                 totalTimeNoPk += timeNoPk
 
-        avgTimeWithPk = totalTimeWithPk / (RUNS * QUERIES_PER_RUN)
-        avgTimeNoPk = totalTimeNoPk / (RUNS * QUERIES_PER_RUN)
+        avgTimeWithPk = totalTimeWithPk / (runs * queriesPerRun)
+        avgTimeNoPk = totalTimeNoPk / (runs * queriesPerRun)
 
         resultsWithPk.append({'count': rowCount, 'time': avgTimeWithPk})
         resultsNoPk.append({'count': rowCount, 'time': avgTimeNoPk})
@@ -225,7 +223,7 @@ def measurePkInequalityEffect(rowCounts, resultsDir, savePlot):
     return resultsWithPk
 
 
-def measurePkInsertEffect(rowCounts, resultsDir, savePlot):
+def measurePkInsertEffect(rowCounts, resultsDir, savePlot, runs=1, queriesPerRun=10):
     tableWithPk = 'movie'
     tableNoPk = 'movie_no_pk'
 
@@ -243,7 +241,7 @@ def measurePkInsertEffect(rowCounts, resultsDir, savePlot):
         totalTimeWithPk = 0.0
         totalTimeNoPk = 0.0
 
-        for runIndex in range(RUNS):
+        for runIndex in range(runs):
             def insertWithPk():
                 with getDbConnection() as (conn, cur):
                     for i in range(insertCount):
@@ -266,8 +264,8 @@ def measurePkInsertEffect(rowCounts, resultsDir, savePlot):
             with getDbConnection() as (conn, cur):
                 cur.execute(f"DELETE FROM {SANDBOX_SCHEMA_NAME}.{tableNoPk} WHERE title = 'Test Movie'")
 
-        avgTimeWithPk = totalTimeWithPk / RUNS
-        avgTimeNoPk = totalTimeNoPk / RUNS
+        avgTimeWithPk = totalTimeWithPk / runs
+        avgTimeNoPk = totalTimeNoPk / runs
 
         resultsWithPk.append({'count': rowCount, 'time': avgTimeWithPk})
         resultsNoPk.append({'count': rowCount, 'time': avgTimeNoPk})
@@ -297,7 +295,7 @@ def measurePkInsertEffect(rowCounts, resultsDir, savePlot):
     return resultsWithPk
 
 
-def measureStringIndexExperiment(rowCounts, resultsDir, savePlot):
+def measureStringIndexExperiment(rowCounts, resultsDir, savePlot, runs=1, queriesPerRun=10):
     tableWithIdx = 'movie'
     tableNoIdx = 'movie_no_string_idx'
     indexName = 'movie_title_idx'
@@ -324,8 +322,8 @@ def measureStringIndexExperiment(rowCounts, resultsDir, savePlot):
             for row in cur.fetchall():
                 sampleTitles.append(row[0])
 
-        for runIndex in range(RUNS):
-            for queryIndex in range(QUERIES_PER_RUN):
+        for runIndex in range(runs):
+            for queryIndex in range(queriesPerRun):
                 titleIndex = queryIndex % len(sampleTitles)
 
                 def queryWithIdx():
@@ -346,8 +344,8 @@ def measureStringIndexExperiment(rowCounts, resultsDir, savePlot):
                 timeNoIdx = measureAverageTime(queryNoIdx, repeats=1)
                 totalTimeNoIdx += timeNoIdx
 
-        avgTimeWithIdx = totalTimeWithIdx / (RUNS * QUERIES_PER_RUN)
-        avgTimeNoIdx = totalTimeNoIdx / (RUNS * QUERIES_PER_RUN)
+        avgTimeWithIdx = totalTimeWithIdx / (runs * queriesPerRun)
+        avgTimeNoIdx = totalTimeNoIdx / (runs * queriesPerRun)
 
         resultsWithIdx.append({'count': rowCount, 'time': avgTimeWithIdx})
         resultsNoIdx.append({'count': rowCount, 'time': avgTimeNoIdx})
@@ -377,7 +375,7 @@ def measureStringIndexExperiment(rowCounts, resultsDir, savePlot):
     return resultsWithIdx
 
 
-def measureStringLikePrefix(rowCounts, resultsDir, savePlot):
+def measureStringLikePrefix(rowCounts, resultsDir, savePlot, runs=1, queriesPerRun=10):
     tableWithIdx = 'movie'
     tableNoIdx = 'movie_no_string_idx'
     indexName = 'movie_title_idx'
@@ -400,8 +398,8 @@ def measureStringLikePrefix(rowCounts, resultsDir, savePlot):
 
         prefixes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
 
-        for runIndex in range(RUNS):
-            for queryIndex in range(QUERIES_PER_RUN):
+        for runIndex in range(runs):
+            for queryIndex in range(queriesPerRun):
                 prefix = prefixes[queryIndex % len(prefixes)]
 
                 def queryWithIdx():
@@ -420,8 +418,8 @@ def measureStringLikePrefix(rowCounts, resultsDir, savePlot):
                 timeNoIdx = measureAverageTime(queryNoIdx, repeats=1)
                 totalTimeNoIdx += timeNoIdx
 
-        avgTimeWithIdx = totalTimeWithIdx / (RUNS * QUERIES_PER_RUN)
-        avgTimeNoIdx = totalTimeNoIdx / (RUNS * QUERIES_PER_RUN)
+        avgTimeWithIdx = totalTimeWithIdx / (runs * queriesPerRun)
+        avgTimeNoIdx = totalTimeNoIdx / (runs * queriesPerRun)
 
         resultsWithIdx.append({'count': rowCount, 'time': avgTimeWithIdx})
         resultsNoIdx.append({'count': rowCount, 'time': avgTimeNoIdx})
@@ -451,7 +449,7 @@ def measureStringLikePrefix(rowCounts, resultsDir, savePlot):
     return resultsWithIdx
 
 
-def measureStringLikeContains(rowCounts, resultsDir, savePlot):
+def measureStringLikeContains(rowCounts, resultsDir, savePlot, runs=1, queriesPerRun=10):
     tableWithIdx = 'movie'
     tableNoIdx = 'movie_no_string_idx'
     indexName = 'movie_title_idx'
@@ -474,8 +472,8 @@ def measureStringLikeContains(rowCounts, resultsDir, savePlot):
 
         substrings = ['test', 'movie', 'data', 'film', 'story']
 
-        for runIndex in range(RUNS):
-            for queryIndex in range(QUERIES_PER_RUN):
+        for runIndex in range(runs):
+            for queryIndex in range(queriesPerRun):
                 substringIndex = queryIndex % len(substrings)
 
                 def queryWithIdx():
@@ -496,8 +494,8 @@ def measureStringLikeContains(rowCounts, resultsDir, savePlot):
                 timeNoIdx = measureAverageTime(queryNoIdx, repeats=1)
                 totalTimeNoIdx += timeNoIdx
 
-        avgTimeWithIdx = totalTimeWithIdx / (RUNS * QUERIES_PER_RUN)
-        avgTimeNoIdx = totalTimeNoIdx / (RUNS * QUERIES_PER_RUN)
+        avgTimeWithIdx = totalTimeWithIdx / (runs * queriesPerRun)
+        avgTimeNoIdx = totalTimeNoIdx / (runs * queriesPerRun)
 
         resultsWithIdx.append({'count': rowCount, 'time': avgTimeWithIdx})
         resultsNoIdx.append({'count': rowCount, 'time': avgTimeNoIdx})
@@ -527,7 +525,7 @@ def measureStringLikeContains(rowCounts, resultsDir, savePlot):
     return resultsWithIdx
 
 
-def measureStringInsertExperiment(rowCounts, resultsDir, savePlot):
+def measureStringInsertExperiment(rowCounts, resultsDir, savePlot, runs=1, queriesPerRun=10):
     tableWithIdx = 'movie'
     tableNoIdx = 'movie_no_string_idx'
     indexName = 'movie_title_idx'
@@ -550,7 +548,7 @@ def measureStringInsertExperiment(rowCounts, resultsDir, savePlot):
         totalTimeWithIdx = 0.0
         totalTimeNoIdx = 0.0
 
-        for runIndex in range(RUNS):
+        for runIndex in range(runs):
             def insertWithIdx():
                 with getDbConnection() as (conn, cur):
                     for i in range(insertCount):
@@ -573,8 +571,8 @@ def measureStringInsertExperiment(rowCounts, resultsDir, savePlot):
             with getDbConnection() as (conn, cur):
                 cur.execute(f"DELETE FROM {SANDBOX_SCHEMA_NAME}.{tableNoIdx} WHERE title = 'String Test Movie'")
 
-        avgTimeWithIdx = totalTimeWithIdx / RUNS
-        avgTimeNoIdx = totalTimeNoIdx / RUNS
+        avgTimeWithIdx = totalTimeWithIdx / runs
+        avgTimeNoIdx = totalTimeNoIdx / runs
 
         resultsWithIdx.append({'count': rowCount, 'time': avgTimeWithIdx})
         resultsNoIdx.append({'count': rowCount, 'time': avgTimeNoIdx})
@@ -604,7 +602,7 @@ def measureStringInsertExperiment(rowCounts, resultsDir, savePlot):
     return resultsWithIdx
 
 
-def measureFtsSingleWordExperiment(rowCounts, resultsDir, savePlot):
+def measureFtsSingleWordExperiment(rowCounts, resultsDir, savePlot, runs=1, queriesPerRun=10):
     tableWithIdx = 'movie'
     tableNoIdx = 'movie_no_fts_idx'
     indexName = 'movie_description_fts_idx'
@@ -627,8 +625,8 @@ def measureFtsSingleWordExperiment(rowCounts, resultsDir, savePlot):
 
         searchWords = ['action', 'drama', 'story', 'hero', 'adventure']
 
-        for runIndex in range(RUNS):
-            for queryIndex in range(QUERIES_PER_RUN):
+        for runIndex in range(runs):
+            for queryIndex in range(queriesPerRun):
                 word = searchWords[queryIndex % len(searchWords)]
 
                 def queryWithIdx():
@@ -647,8 +645,8 @@ def measureFtsSingleWordExperiment(rowCounts, resultsDir, savePlot):
                 timeNoIdx = measureAverageTime(queryNoIdx, repeats=1)
                 totalTimeNoIdx += timeNoIdx
 
-        avgTimeWithIdx = totalTimeWithIdx / (RUNS * QUERIES_PER_RUN)
-        avgTimeNoIdx = totalTimeNoIdx / (RUNS * QUERIES_PER_RUN)
+        avgTimeWithIdx = totalTimeWithIdx / (runs * queriesPerRun)
+        avgTimeNoIdx = totalTimeNoIdx / (runs * queriesPerRun)
 
         resultsWithIdx.append({'count': rowCount, 'time': avgTimeWithIdx})
         resultsNoIdx.append({'count': rowCount, 'time': avgTimeNoIdx})
@@ -678,7 +676,7 @@ def measureFtsSingleWordExperiment(rowCounts, resultsDir, savePlot):
     return resultsWithIdx
 
 
-def measureFtsMultiWordExperiment(rowCounts, resultsDir, savePlot):
+def measureFtsMultiWordExperiment(rowCounts, resultsDir, savePlot, runs=1, queriesPerRun=10):
     tableWithIdx = 'movie'
     tableNoIdx = 'movie_no_fts_idx'
     indexName = 'movie_description_fts_idx'
@@ -701,8 +699,8 @@ def measureFtsMultiWordExperiment(rowCounts, resultsDir, savePlot):
 
         searchPhrases = ['action & hero', 'drama & story', 'adventure & journey', 'love & story', 'crime & detective']
 
-        for runIndex in range(RUNS):
-            for queryIndex in range(QUERIES_PER_RUN):
+        for runIndex in range(runs):
+            for queryIndex in range(queriesPerRun):
                 phraseIndex = queryIndex % len(searchPhrases)
 
                 def queryWithIdx():
@@ -723,8 +721,8 @@ def measureFtsMultiWordExperiment(rowCounts, resultsDir, savePlot):
                 timeNoIdx = measureAverageTime(queryNoIdx, repeats=1)
                 totalTimeNoIdx += timeNoIdx
 
-        avgTimeWithIdx = totalTimeWithIdx / (RUNS * QUERIES_PER_RUN)
-        avgTimeNoIdx = totalTimeNoIdx / (RUNS * QUERIES_PER_RUN)
+        avgTimeWithIdx = totalTimeWithIdx / (runs * queriesPerRun)
+        avgTimeNoIdx = totalTimeNoIdx / (runs * queriesPerRun)
 
         resultsWithIdx.append({'count': rowCount, 'time': avgTimeWithIdx})
         resultsNoIdx.append({'count': rowCount, 'time': avgTimeNoIdx})
@@ -754,7 +752,7 @@ def measureFtsMultiWordExperiment(rowCounts, resultsDir, savePlot):
     return resultsWithIdx
 
 
-def measureFtsInsertExperiment(rowCounts, resultsDir, savePlot):
+def measureFtsInsertExperiment(rowCounts, resultsDir, savePlot, runs=1, queriesPerRun=10):
     tableWithIdx = 'movie'
     tableNoIdx = 'movie_no_fts_idx'
     indexName = 'movie_description_fts_idx'
@@ -777,7 +775,7 @@ def measureFtsInsertExperiment(rowCounts, resultsDir, savePlot):
         totalTimeWithIdx = 0.0
         totalTimeNoIdx = 0.0
 
-        for runIndex in range(RUNS):
+        for runIndex in range(runs):
             def insertWithIdx():
                 with getDbConnection() as (conn, cur):
                     for i in range(insertCount):
@@ -800,8 +798,8 @@ def measureFtsInsertExperiment(rowCounts, resultsDir, savePlot):
             with getDbConnection() as (conn, cur):
                 cur.execute(f"DELETE FROM {SANDBOX_SCHEMA_NAME}.{tableNoIdx} WHERE title = 'FTS Test'")
 
-        avgTimeWithIdx = totalTimeWithIdx / RUNS
-        avgTimeNoIdx = totalTimeNoIdx / RUNS
+        avgTimeWithIdx = totalTimeWithIdx / runs
+        avgTimeNoIdx = totalTimeNoIdx / runs
 
         resultsWithIdx.append({'count': rowCount, 'time': avgTimeWithIdx})
         resultsNoIdx.append({'count': rowCount, 'time': avgTimeNoIdx})

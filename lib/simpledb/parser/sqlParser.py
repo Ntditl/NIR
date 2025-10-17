@@ -1,7 +1,5 @@
 import json
 
-# Простая структуризация исходного парсинга для совместимости
-# Возвращает словарь {type:..., data:{...}}
 
 def parseSql(sqlText: str):
     s = sqlText.strip()
